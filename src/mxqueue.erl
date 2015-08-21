@@ -19,13 +19,27 @@
 %% THE SOFTWARE.
 %%
 
+-module(mxqueue).
 
-% queue limits
--define(MXQUEUE_LOW_THRESHOLD,          0.2).
--define(MXQUEUE_HIGH_THRESHOLD,         0.8).
--define(MXQUEUE_LENGTH_LIMIT,           20000).
+-include("include/mx.hrl").
 
--define(MXQUEUE_PRIO_NORMAL,            0).
--define(MXQUEUE_PRIO_HIGH,              5).
--define(MXQUEUE_PRIO_RT,                50).
+-record(mxq,    {name,
+                 queue              = queue:new(), 
+                 length             = 0,           %% current queue len
+                 threshold_low      = ?MXQUEUE_LOW_THRESHOLD,
+                 threshold_high     = ?MXQUEUE_HIGH_THRESHOLD,
+                 length_limit       = ?MXQUEUE_LENGTH_LIMIT,
+                 priority           = ?MXQUEUE_PRIO_NORMAL,
+                 alarm}).
 
+-type mxq() :: #mxq{}.
+
+-export_type([mxq/0]).
+
+create(QueueName)
+
+
+put()
+
+is_empty(#mxq{length = 0})  -> true;
+is_empty(_)                 -> false.
