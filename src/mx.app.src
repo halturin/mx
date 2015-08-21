@@ -1,0 +1,14 @@
+{application, mx,
+ [
+  {description, "OTP Message Broker"},
+  {vsn, git},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { mx_app, []}},
+  {env, [
+    {config, "conf/mx.conf"}
+  ]}
+ ]}.
