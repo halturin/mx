@@ -23,23 +23,62 @@
 
 -include("include/mx.hrl").
 
--record(mxq,    {name,
-                 queue              = queue:new(), 
-                 length             = 0,           %% current queue len
-                 threshold_low      = ?MXQUEUE_LOW_THRESHOLD,
-                 threshold_high     = ?MXQUEUE_HIGH_THRESHOLD,
-                 length_limit       = ?MXQUEUE_LENGTH_LIMIT,
-                 priority           = ?MXQUEUE_PRIO_NORMAL,
-                 alarm}).
+-record(mxq,{queue              = queue:new(),
+             name,
+             length             = 0 :: non_neg_integer(), %% current len
+             length_limit       = ?MXQUEUE_LENGTH_LIMIT,
+             threshold_low      = ?MXQUEUE_LOW_THRESHOLD,
+             threshold_high     = ?MXQUEUE_HIGH_THRESHOLD,
+             alarm}).
 
 -type mxq() :: #mxq{}.
-
 -export_type([mxq/0]).
 
-create(QueueName)
+-export([create/1, put/2, get/1, pop/1, is_empty/1, len/1]).
 
+create(QueueName) ->
+    #mxq{
+        name            = QueueName,
+        alarm           = fun(_) -> ok end % FIXME!!!
+    }.
 
-put()
+put(_, #mxq{queue = Q, length = L, length_limit = LM, alarm = F} = MXQ) when L > LM ->
+    % exceed the limit. drop message.
+    MXQ#mxq{alarm   = F({mxq_alarm_queue_length_limit, Q})};
 
-is_empty(#mxq{length = 0})  -> true;
-is_empty(_)                 -> false.
+put(Message, #mxq{queue = Q, length = L, threshold_high = LH, alarm = F} = MXQ) when L > LH ->
+    MXQ#mxq{queue   = queue:in(Message, Q),
+            length  = L + 1,
+            alarm   = F({mxq_alarm_threshold_high, Q})};
+
+put(Message, #mxq{queue = Q, length = L, threshold_low = LL, alarm = F} = MXQ) when L > LL ->
+    MXQ#mxq{queue   = queue:in(Message, Q),
+            length  = L + 1,
+            alarm   = F({mxq_alarm_threshold_low, Q})}.
+
+get(#mxq{length = L} = MXQ) when L == 0 ->
+    {empty, MXQ};
+
+get(#mxq{queue = Q, length = L, alarm = F} = MXQ) ->
+    {Message, Q1} = queue:out(Q),
+    {Message, MXQ#mxq{
+        queue   = Q1,
+        length  = L - 1,
+        alarm   = F({mxq_alarm_clear, Q})
+        }}.
+
+pop(#mxq{length = L} = MXQ) when L == 0 ->
+    {empty, MXQ};
+
+pop(#mxq{queue = Q, length = L, alarm = F} = MXQ) ->
+    {Message, Q1} = queue:out_r(Q),
+    {Message, MXQ#mxq{
+        queue   = Q1,
+        length  = L - 1,
+        alarm   = F({mxq_alarm_clear, Q})
+        }}.
+
+is_empty(#mxq{length = 0}) -> true;
+is_empty(#mxq{length = _}) -> false.
+
+len(#mxq{length = L})  -> L.

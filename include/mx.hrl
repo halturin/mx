@@ -21,7 +21,7 @@
 
 
 % queue limits
--define(MXQUEUE_LOW_THRESHOLD,          0.2).
+-define(MXQUEUE_LOW_THRESHOLD,          0.6).
 -define(MXQUEUE_HIGH_THRESHOLD,         0.8).
 -define(MXQUEUE_LENGTH_LIMIT,           20000).
 
