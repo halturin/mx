@@ -18,7 +18,56 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %%
-
+%%
+%% 1. Брокер работает на gproc. В качестве хранилища используется Mnesia. Лидер кластера испльзует
+%%    модель disk_copy, остальные - ram_copy. Перевыборы лидера должны происходить раз в сутки (час?).
+%%    После переизбрания новый лидер должен перейти на модель disk_copy. Алгоритм выбора лидера - очередь.
+%%
+%% 2. Структура брокера 
+%%    Брокер не работает с конечными отправителями и получателями. Он работает с бекэндами, которые 
+%%    работаеют непосредственно на последней миле. В случае платформы - последние мили обслуживают 
+%%    horn (websocket, email, sms) и synapse(llp/llsn)
+%%
+%% 3. Клиенты (отправители/получатели) хранятся в Mnesia. Управление оными произходит через соответствующий
+%%    API брокера 
+%%         mx:client(MX, register, Client)
+%%         mx:client(MX, set, ClientKey, Opts)
+%%         mx:client(MX, unregister, ClientKey)
+%%         mx:client(MX, info, Client)
+%%         mx:client(MX, subscribe, ClientKey, ChannelName)
+%%         mx:client(MX, unsubscribe, ClientKey, ChannelName)
+%%         mx:client(MX, join, ClientKey, PoolName)
+%%         mx:client(MX, leave, ClientKey, PoolName)
+%%
+%%         mx:channel(MX, register, ChannelName, Client) - returns ChannelKey
+%%         mx:channel(MX, set, ChannelKey, Opts) - set options for the Channel ('skip offline': true/false. sms/email aren't required the receiver being online state)
+%%         mx:channel(MX, unregister, ChannelKey)
+%%         mx:channel(MX, info, ChannelName)
+%%
+%%
+%%         mx:pool(MX, register, PoolName, Client) - return PoolKey
+%%         mx:pool(MX, set, PoolKey, Opts) - set options for the Pool
+%%         mx:pool(MX, unregister, PoolKey)
+%%         mx:pool(MX, info, PoolName)
+%%      
+%%         mx:send(MX, ClientKey, ClientTo, Message) - unicast message
+%%             returns: ok
+%%                      offline - client is offline
+%%                      unknown - client is not registered
+%%
+%%         mx:send(MX, ChannelKey, Message) - muilticast 
+%%             returns: ok
+%%                      nobody  - channel has no subscribers
+%%                      offline - backend are served this channel is off.
+%%                      unknown - channel is not registered
+%%
+%%         mx:send(MX, PoolKey, Message) - pooled unicast message
+%%             returns: ok
+%%
+%%                      offline - all the clients are offlined.
+%%                      unknown - pool is not registered
+%%
+%%         mx:control(MX, ControlKey, Cmd)
 
 -module(mx).
 
@@ -55,8 +104,10 @@
 
 client(MX, register, Client) ->
     ok;
+
 client(MX, unregister, ClientKey) ->
     ok;
+
 client(MX, info, Client) ->
     ok.
 
@@ -75,53 +126,42 @@ client(MX, join, ClientKey, PoolName) ->
 client(MX, leave, ClientKey, PoolName) ->
     ok.
 
-% returns ChannelKey
+
 channel(MX, register, ChannelName, Client) ->
     ok;
-% set options for the Channel ('skip offline': true/false. sms/email aren't required 
-% the receiver being online state)
+
 channel(MX, set, ChannelKey, Opts) ->
     ok.
+
 channel(MX, unregister, ChannelKey) ->
     ok;
 
 channel(MX, info, ChannelName) ->
     ok.
         
-% return PoolKey
+
 pool(MX, register, PoolName, Client) ->
     ok;
 
-% set options for the Pool
 pool(MX, set, PoolKey, Opts) ->
     ok.
 
 pool(MX, unregister, PoolKey) ->
     ok;
+
 pool(MX, info, PoolName) ->
     ok.
 
-% unicast message
-% returns: ok
-%          offline - client is offline
-%          unknown - client is not registered
+
 send(MX, ClientKey, ClientTo, Message) ->
     ok.
 
-% muilticast 
-% returns: ok
-%          nobody  - channel has no subscribers
-%          offline - backend are served this channel is off.
-%          unknown - channel is not registered
 send(MX, ChannelKey, Message) ->
     ok;
-% pooled unicast message
-% returns: ok
-%          nobody            
-%          offline - all the clients are offlined.
-%          unknown - pool is not registered
+
 send(MX, PoolKey, Message) -> 
     ok.
+
 
 control(MX, ControlKey, Cmd) ->
     ok.
