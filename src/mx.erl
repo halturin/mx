@@ -33,6 +33,16 @@
          terminate/2,
          code_change/3]).
 
+-export([client/3,
+         client/4,
+         channel/3,
+         channel/4,
+         pool/3,
+         pool/4,
+         send/3,
+         send/4,
+         control/3
+        ]).
 
 %% records
 -record(state, {config :: list()}).
@@ -42,6 +52,79 @@
 
 %%% API
 %%%===================================================================
+
+client(MX, register, Client) ->
+    ok;
+client(MX, unregister, ClientKey) ->
+    ok;
+client(MX, info, Client) ->
+    ok.
+
+client(MX, set, ClientKey, Opts) ->
+    ok;
+
+client(MX, subscribe, ClientKey, ChannelName) ->
+    ok;
+
+client(MX, unsubscribe, ClientKey, ChannelName) ->
+    ok;
+
+client(MX, join, ClientKey, PoolName) ->
+    ok;
+
+client(MX, leave, ClientKey, PoolName) ->
+    ok.
+
+% returns ChannelKey
+channel(MX, register, ChannelName, Client) ->
+    ok;
+% set options for the Channel ('skip offline': true/false. sms/email aren't required 
+% the receiver being online state)
+channel(MX, set, ChannelKey, Opts) ->
+    ok.
+channel(MX, unregister, ChannelKey) ->
+    ok;
+
+channel(MX, info, ChannelName) ->
+    ok.
+        
+% return PoolKey
+pool(MX, register, PoolName, Client) ->
+    ok;
+
+% set options for the Pool
+pool(MX, set, PoolKey, Opts) ->
+    ok.
+
+pool(MX, unregister, PoolKey) ->
+    ok;
+pool(MX, info, PoolName) ->
+    ok.
+
+% unicast message
+% returns: ok
+%          offline - client is offline
+%          unknown - client is not registered
+send(MX, ClientKey, ClientTo, Message) ->
+    ok.
+
+% muilticast 
+% returns: ok
+%          nobody  - channel has no subscribers
+%          offline - backend are served this channel is off.
+%          unknown - channel is not registered
+send(MX, ChannelKey, Message) ->
+    ok;
+% pooled unicast message
+% returns: ok
+%          nobody            
+%          offline - all the clients are offlined.
+%          unknown - pool is not registered
+send(MX, PoolKey, Message) -> 
+    ok.
+
+control(MX, ControlKey, Cmd) ->
+    ok.
 
 %%--------------------------------------------------------------------
 %% @doc
