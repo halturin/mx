@@ -21,4 +21,74 @@
 
 -module(mxmnesia).
 
+-export([start/0, start/1, stop/0]).
 
+-include_lib("include/mx.hrl").
+
+start() ->
+    start(master).
+
+start(master) ->
+    case mnesia:create_schema([node()]) of
+        ok ->
+            ok;
+        {error, {_, {already_exists, _}}} ->
+            ok;
+        {error, E} ->
+            lager:error("failed to create Mnesia schema: ~p", [E])
+    end,
+    ok = mnesia:start(),
+    [create_table(T,A) || {T,A} <- ?MXMNESIA_TABLES],
+    mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
+    ok;
+
+% start as slave
+start(MasterNode) ->
+    ok = stop(),
+    ok = mnesia:delete_schema([node()]),
+    ok = mnesia:start(),
+    case mnesia:change_config(extra_db_nodes, [MasterNode]) of
+        [] ->
+            throw({error, "failed to start Mnesia in slave mode"});
+        [ok, Cluster] ->
+            % FIXME.
+            lagger:info("Mnesia cluster: ~p", [Cluster]),
+            ok
+    end,
+    [copy_table(T) || T <- ?MXMNESIA_TABLES],
+    mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
+    ok.
+
+stop() ->
+    mnesia:stop(),
+    wait(10). % 10 sec
+
+wait(N) ->
+    case mnesia:system_info(is_running) of
+        no ->
+            ok;
+        stopping when N == 0 ->
+            lagger:error("Can not stop Mnesia"),
+            cantstop;
+
+        stopping ->
+            timer:sleep(1000),
+            wait(N - 1);
+        X ->
+            lagger:error("unhandled mnesia state: ~p", [X]),
+            error
+    end.
+
+create_table(T, A) ->
+    case mnesia:create_table(T, A) of
+        {atomic, ok}                    -> ok;
+        {aborted, {already_exists, _}}  -> ok;
+        Error                           -> Error
+    end.
+
+copy_table(T) ->
+    case mnesia:add_table_copy(T, node(), ram_copies) of
+        {atomic, ok}                        -> ok;
+        {aborted, {already_exists, _, _}}   -> ok;
+        Error                               -> Error
+    end.

@@ -42,7 +42,7 @@ create(QueueName) ->
         alarm           = fun(_) -> ok end % FIXME!!!
     }.
 
-put(_, #mxq{queue = Q, length = L, length_limit = LM, alarm = F} = MXQ) when L > LM ->
+put(_Message, #mxq{queue = Q, length = L, length_limit = LM, alarm = F} = MXQ) when L > LM ->
     % exceed the limit. drop message.
     MXQ#mxq{alarm   = F({mxq_alarm_queue_length_limit, Q})};
 
@@ -54,7 +54,17 @@ put(Message, #mxq{queue = Q, length = L, threshold_high = LH, alarm = F} = MXQ) 
 put(Message, #mxq{queue = Q, length = L, threshold_low = LL, alarm = F} = MXQ) when L > LL ->
     MXQ#mxq{queue   = queue:in(Message, Q),
             length  = L + 1,
-            alarm   = F({mxq_alarm_threshold_low, Q})}.
+            alarm   = F({mxq_alarm_threshold_low, Q})};
+
+put(Message, #mxq{queue = Q, length = L, alarm = F} = MXQ) when L == 0 ->
+    MXQ#mxq{queue   = queue:in(Message, Q),
+            length  = L + 1,
+            alarm   = F({mxq_alarm_has_message, Q})};
+
+put(Message, #mxq{queue = Q, length = L} = MXQ) ->
+    MXQ#mxq{queue   = queue:in(Message, Q),
+            length  = L + 1}.
+
 
 get(#mxq{length = L} = MXQ) when L == 0 ->
     {empty, MXQ};

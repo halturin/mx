@@ -21,11 +21,38 @@
 
 
 % queue limits
--define(MXQUEUE_LOW_THRESHOLD,          0.6).
--define(MXQUEUE_HIGH_THRESHOLD,         0.8).
--define(MXQUEUE_LENGTH_LIMIT,           20000).
+-define(MXQUEUE_LOW_THRESHOLD,      0.6).
+-define(MXQUEUE_HIGH_THRESHOLD,     0.8).
+-define(MXQUEUE_LENGTH_LIMIT,       20000).
 
--define(MXQUEUE_PRIO_NORMAL,            0).
--define(MXQUEUE_PRIO_HIGH,              5).
--define(MXQUEUE_PRIO_RT,                50).
+-define(MXQUEUE_PRIO_NORMAL,        0).
+-define(MXQUEUE_PRIO_HIGH,          5).
+-define(MXQUEUE_PRIO_RT,            50).
 
+-define(MXMNESIA_TABLES,           [{mnesia_client,args}, {mnesia_channel,args}, {mnesia_defer, args}]).
+
+-record(mnesia_client, {
+    name        :: binary(),
+    key         :: binary(),
+    channels    :: list(),
+    handler     :: pid()                % who manage the client (for recieving messages)
+    }).
+
+-record(mnesia_channel, {
+    name        :: binary(),
+    key         :: binary(),
+    client,                             % owner. publisher
+    subscribers :: list(),              % list of subscribed clients
+    handler     :: pid(),               % who manage the last mile to the client (WebSocket, email, sms etc.)
+    length      :: non_neg_integer(),   % max length of queue
+    lt          :: non_neg_integer(),   % low threshold
+    ht          :: non_neg_integer(),   % high threshold
+    priority    :: non_neg_integer(),   % priority
+    defer       :: boolean()            % deferrable
+    }).
+
+-record(mnesia_defer, {
+    client,                             % message for direct sending to the client
+    channel,                            % message for the subscribers
+    message
+    }).
