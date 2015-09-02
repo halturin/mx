@@ -6,3 +6,5 @@ log
 *.o
 *.beam
 erl_crash.dump
+Mnesia*
+
