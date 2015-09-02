@@ -24,6 +24,7 @@
 -export([start/0, start/1, stop/0]).
 
 -include_lib("include/mx.hrl").
+-include_lib("include/log.hrl").
 
 start() ->
     start(master).
@@ -35,7 +36,7 @@ start(master) ->
         {error, {_, {already_exists, _}}} ->
             ok;
         {error, E} ->
-            lager:error("failed to create Mnesia schema: ~p", [E])
+            ?ERR("failed to create Mnesia schema: ~p", [E])
     end,
     ok = mnesia:start(),
     [create_table(T,A) || {T,A} <- ?MXMNESIA_TABLES],
@@ -52,7 +53,7 @@ start(MasterNode) ->
             throw({error, "failed to start Mnesia in slave mode"});
         {ok, Cluster} ->
             % FIXME.
-            lagger:info("Mnesia cluster: ~p", [Cluster]),
+            ?DBG("Mnesia cluster: ~p", [Cluster]),
             ok
     end,
     [copy_table(T) || T <- ?MXMNESIA_TABLES],
@@ -68,14 +69,14 @@ wait(N) ->
         no ->
             ok;
         stopping when N == 0 ->
-            lagger:error("Can not stop Mnesia"),
+            lager:error("Can not stop Mnesia"),
             cantstop;
 
         stopping ->
             timer:sleep(1000),
             wait(N - 1);
         X ->
-            lagger:error("unhandled mnesia state: ~p", [X]),
+            ?ERR("unhandled mnesia state: ~p", [X]),
             error
     end.
 
