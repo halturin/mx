@@ -50,7 +50,7 @@ start(MasterNode) ->
     case mnesia:change_config(extra_db_nodes, [MasterNode]) of
         [] ->
             throw({error, "failed to start Mnesia in slave mode"});
-        [ok, Cluster] ->
+        {ok, Cluster} ->
             % FIXME.
             lagger:info("Mnesia cluster: ~p", [Cluster]),
             ok
