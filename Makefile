@@ -36,7 +36,13 @@ dialyze: build-plt
 
 run: compile
 	@echo "[ Run (debug mode)... ]"
-	@$(ERL) -name mxnode@127.0.0.1\
+	@$(ERL) -name mxnode01@127.0.0.1\
+                -pa ebin deps/*/ebin  ../deps/*/ebin ../*/ebin\
+                -s mx_helper\
+                -setcookie devcook -Ddebug=true
+run2: compile
+	@echo "[ Run (debug mode)... ]"
+	@$(ERL) -name mxnode02@127.0.0.1\
                 -pa ebin deps/*/ebin  ../deps/*/ebin ../*/ebin\
                 -s mx_helper\
                 -setcookie devcook -Ddebug=true
