@@ -23,7 +23,7 @@
 
 -behaviour(gen_server).
 
--export([start_link/0]).
+-export([start_link/2]).
 
 -export([init/1,
          handle_call/3,
@@ -33,7 +33,10 @@
          code_change/3]).
 
 %% records
--record(state, {config :: list()}).
+-record(state, {
+            id      :: non_neg_integer,
+            config  :: list()
+            }).
 
 %% includes
 -include_lib("include/log.hrl").
@@ -48,8 +51,8 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+start_link(I, Opts) ->
+    gen_server:start_link(?MODULE, [I, Opts], []).
 
 %%% gen_server callbacks
 %%%===================================================================
@@ -65,9 +68,10 @@ start_link() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
-    process_flag(trap_exit, true),
-    {ok, #state{config = []}}.
+init([I, Opts]) ->
+    % process_flag(trap_exit, true),
+    gproc_pool:connect_worker(mx_pubsub, {mx_broker, I}),
+    {ok, #state{id = I, config = []}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -129,8 +133,10 @@ handle_info(Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, _State) ->
+terminate(_Reason, #state{id = ID}) ->
+    gproc_pool:disconnect_worker(mx_pubsub, {mx_broker, ID}),
     ok.
+
 
 %%--------------------------------------------------------------------
 %% @private

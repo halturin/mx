@@ -29,7 +29,7 @@
 %% includes
 -include_lib("include/log.hrl").
 
--define(APPS, [ syntax_tools, compiler, goldrush, lager, mx ]).
+-define(APPS, [ syntax_tools, compiler, goldrush, lager, gproc, mx ]).
 
 
 reload_m(M) ->

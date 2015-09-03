@@ -28,8 +28,6 @@
 %% Supervisor callbacks
 -export([init/1]).
 
-%% Helper macro for declaring children of supervisor
--define(CHILD(I, Type, Opts), {I, {I, start_link, [Opts]}, permanent, 5000, Type, [I]}).
 
 %% API functions
 %% ===================================================================
@@ -42,16 +40,19 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, Opts}      = application:get_env(mx, broker),
+    % {ok, Opts}      = application:get_env(mx, broker),
+    Opts            = [],
     Workers         = erlang:system_info(schedulers),
-    gproc_pool:new(mx_pubsub, hash, {auto_size, true})
+    gproc_pool:new(mx_pubsub, hash, [{size, Workers}]),
 
     Children = lists:map(
         fun(I) ->
             Worker = {mx_broker, I},
             gproc_pool:add_worker(mx_pubsub, Worker, I),
-            ?CHILD(Worker, worker, Opts)
-        end, lists:seq(q, Workers)),
+            {Worker, {mx_broker, start_link, [I, Opts]},
+                        permanent, 5000, worker, [mx_broker]}
+        end, lists:seq(1, Workers)),
 
-    {ok, { {one_for_all, 10, 100}, [ Children ] } }.
+    io:format("Children list: ~p", [Children]),
+    {ok, { {one_for_all, 5, 10}, Children } }.
 
