@@ -19,7 +19,7 @@
 %% THE SOFTWARE.
 %%
 
--module(mxbroker).
+-module(mx_broker).
 
 -behaviour(gen_server).
 

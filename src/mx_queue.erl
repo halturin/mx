@@ -19,7 +19,7 @@
 %% THE SOFTWARE.
 %%
 
--module(mxqueue).
+-module(mx_queue).
 
 -include("include/mx.hrl").
 

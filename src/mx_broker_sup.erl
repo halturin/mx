@@ -19,7 +19,7 @@
 %% THE SOFTWARE.
 %%
 
--module(mx_sup).
+-module(mx_broker_sup).
 
 -behaviour(supervisor).
 
@@ -29,7 +29,7 @@
 -export([init/1]).
 
 %% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
+-define(CHILD(I, Type, Opts), {I, {I, start_link, [Opts]}, permanent, 5000, Type, [I]}).
 
 %% API functions
 %% ===================================================================
@@ -42,8 +42,16 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, [
-        ?CHILD(mx, worker),
-        ?CHILD(mx_broker, supervisor)
-    ]} }.
+    {ok, Opts}      = application:get_env(mx, broker),
+    Workers         = erlang:system_info(schedulers),
+    gproc_pool:new(mx_pubsub, hash, {auto_size, true})
+
+    Children = lists:map(
+        fun(I) ->
+            Worker = {mx_broker, I},
+            gproc_pool:add_worker(mx_pubsub, Worker, I),
+            ?CHILD(Worker, worker, Opts)
+        end, lists:seq(q, Workers)),
+
+    {ok, { {one_for_all, 10, 100}, [ Children ] } }.
 

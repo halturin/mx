@@ -19,7 +19,7 @@
 %% THE SOFTWARE.
 %%
 
--module(mxmnesia).
+-module(mx_mnesia).
 
 -export([start/0, start/1, stop/0]).
 
