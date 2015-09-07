@@ -32,6 +32,9 @@
          terminate/2,
          code_change/3]).
 
+-export([test/0, test1/0]).
+
+
 %% records
 -record(state, {
             id      :: non_neg_integer,
@@ -43,6 +46,16 @@
 
 %%% API
 %%%===================================================================
+
+test() ->
+    P = gproc_pool:pick_worker(mx_pubsub),
+    io:format("AAAA ~p ~n", [P]),
+    gen_server:call(P, test).
+
+test1() ->
+    P = gproc_pool:pick_worker(mx_pubsub),
+    io:format("AAAA ~p ~n", [P]),
+    gen_server:call(P, test1).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -87,6 +100,11 @@ init([I, Opts]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_call(test, F, State) ->
+    {reply, testok, State};
+
+handle_call(test1, F, State) ->
+    {reply, testok1, State};
 
 handle_call(Request, _From, State) ->
     ?ERR("unhandled call: ~p", [Request]),

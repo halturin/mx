@@ -29,6 +29,8 @@
 -export([init/1]).
 
 
+-define(CHILD(I, Type, Args), {{N,I}, {N, start_link, [Args]}, permanent, 5000, Type, [N]}).
+
 %% API functions
 %% ===================================================================
 
@@ -43,16 +45,17 @@ init([]) ->
     % {ok, Opts}      = application:get_env(mx, broker),
     Opts            = [],
     Workers         = erlang:system_info(schedulers),
-    gproc_pool:new(mx_pubsub, hash, [{size, Workers}]),
+    gproc_pool:new(mx_pubsub, round_robin, [{size, Workers}]),
 
     Children = lists:map(
         fun(I) ->
             Worker = {mx_broker, I},
             gproc_pool:add_worker(mx_pubsub, Worker, I),
+
+
             {Worker, {mx_broker, start_link, [I, Opts]},
                         permanent, 5000, worker, [mx_broker]}
         end, lists:seq(1, Workers)),
 
-    io:format("Children list: ~p", [Children]),
     {ok, { {one_for_all, 5, 10}, Children } }.
 

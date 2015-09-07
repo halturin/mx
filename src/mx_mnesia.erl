@@ -21,7 +21,7 @@
 
 -module(mx_mnesia).
 
--export([start/0, start/1, stop/0]).
+-export([start/0, start/1, stop/0, create_table/2]).
 
 -include_lib("include/mx.hrl").
 -include_lib("include/log.hrl").

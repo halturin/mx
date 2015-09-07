@@ -29,16 +29,16 @@
 -define(MXQUEUE_PRIO_HIGH,          5).
 -define(MXQUEUE_PRIO_RT,            50).
 
--define(MXMNESIA_TABLES,           [{mnesia_client,args}, {mnesia_channel,args}, {mnesia_defer, args}]).
+-define(MXMNESIA_TABLES,           [{mx_table_client,[]}, {mx_table_channel,[]}, {mx_table_defer, []}]).
 
--record(mnesia_client, {
+-record(mx_table_client, {
     name        :: binary(),
     key         :: binary(),
     channels    :: list(),
-    handler     :: pid()                % who manage the client (for recieving messages)
+    handler     :: pid() | offline      % who manage the client (for recieving messages)
     }).
 
--record(mnesia_channel, {
+-record(mx_table_channel, {
     name        :: binary(),
     key         :: binary(),
     client,                             % owner. publisher
@@ -51,7 +51,7 @@
     defer       :: boolean()            % deferrable
     }).
 
--record(mnesia_defer, {
+-record(mx_table_defer, {
     client,                             % message for direct sending to the client
     channel,                            % message for the subscribers
     message

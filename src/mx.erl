@@ -23,13 +23,13 @@
 %%    модель disk_copy, остальные - ram_copy. Перевыборы лидера должны происходить раз в сутки (час?).
 %%    После переизбрания новый лидер должен перейти на модель disk_copy. Алгоритм выбора лидера - очередь.
 %%
-%% 2. Структура брокера 
-%%    Брокер не работает с конечными отправителями и получателями. Он работает с бекэндами, которые 
-%%    работаеют непосредственно на последней миле. В случае платформы - последние мили обслуживают 
+%% 2. Структура брокера
+%%    Брокер не работает с конечными отправителями и получателями. Он работает с бекэндами, которые
+%%    работаеют непосредственно на последней миле. В случае платформы - последние мили обслуживают
 %%    horn (websocket, email, sms) и synapse(llp/llsn)
 %%
 %% 3. Клиенты (отправители/получатели) хранятся в Mnesia. Управление оными произходит через соответствующий
-%%    API брокера 
+%%    API брокера
 %%         mx:client(MX, register, Client)
 %%         mx:client(MX, set, ClientKey, Opts)
 %%         mx:client(MX, unregister, ClientKey)
@@ -49,13 +49,13 @@
 %%         mx:pool(MX, set, PoolKey, Opts) - set options for the Pool
 %%         mx:pool(MX, unregister, PoolKey)
 %%         mx:pool(MX, info, PoolName)
-%%      
+%%
 %%         mx:send(MX, ClientKey, ClientTo, Message) - unicast message
 %%             returns: ok
 %%                      offline - client is offline
 %%                      unknown - client is not registered
 %%
-%%         mx:send(MX, ChannelKey, Message) - muilticast 
+%%         mx:send(MX, ChannelKey, Message) - muilticast
 %%             returns: ok
 %%                      nobody  - channel has no subscribers
 %%                      offline - backend are served this channel is off.
@@ -68,6 +68,11 @@
 %%                      unknown - pool is not registered
 %%
 %%         mx:control(MX, ControlKey, Cmd)
+
+%%      Ключ для Client/Channel - это бинарный md5 + префикс
+%%          <<$*, ClientKey/binary>>
+%%          <<$#, ChannelKey/binary>>
+%%          <<$@, PoolKey/binary>>
 
 -module(mx).
 
@@ -82,15 +87,15 @@
          terminate/2,
          code_change/3]).
 
--export([client/3,
-         client/4,
+-export([client/2,
+         client/3,
+         channel/2,
          channel/3,
-         channel/4,
+         pool/2,
          pool/3,
-         pool/4,
+         send/2,
          send/3,
-         send/4,
-         control/3
+         control/2
         ]).
 
 %% records
@@ -98,72 +103,83 @@
 
 %% includes
 -include_lib("include/log.hrl").
+-include_lib("include/mx.hrl").
 
 %%% API
 %%%===================================================================
+client(register, Client) when is_integer(Client)->
+    client(register, integer_to_binary(Client));
 
-client(MX, register, Client) ->
-    ok;
+client(register, Client) when is_list(Client)->
+    client(register, list_to_binary(Client));
 
-client(MX, unregister, ClientKey) ->
-    ok;
+client(register, Client) when is_binary(Client)->
+    gen_server:call(?MODULE, {register, Client});
 
-client(MX, info, Client) ->
+client(unregister, <<$*,ClientKey/binary>>) ->
+    gen_server:call(?MODULE, {unregister, ClientKey});
+
+client(info, Client) ->
     ok.
 
-client(MX, set, ClientKey, Opts) ->
+client(set, ClientKey, Opts) ->
     ok;
 
-client(MX, subscribe, ClientKey, ChannelName) ->
+client(subscribe, ClientKey, ChannelName) when is_list(ChannelName)->
+    client(subscribe, ClientKey, list_to_binary(ChannelName));
+client(subscribe, <<$*, ClientKey/binary>>, ChannelName) ->
+    gen_server:call(?MODULE, {subscribe, ClientKey, ChannelName});
+
+client(unsubscribe, ClientKey, ChannelName) when is_list(ChannelName)->
+    client(unsubscribe, ClientKey, list_to_binary(ChannelName));
+client(unsubscribe, ClientKey, ChannelName) when is_binary(ChannelName)->
+    gen_server:call(?MODULE, {unsubscribe, ClientKey, ChannelName});
+
+
+client(join, ClientKey, PoolName) ->
     ok;
 
-client(MX, unsubscribe, ClientKey, ChannelName) ->
-    ok;
-
-client(MX, join, ClientKey, PoolName) ->
-    ok;
-
-client(MX, leave, ClientKey, PoolName) ->
-    ok.
-
-
-channel(MX, register, ChannelName, Client) ->
-    ok;
-
-channel(MX, set, ChannelKey, Opts) ->
-    ok.
-
-channel(MX, unregister, ChannelKey) ->
-    ok;
-
-channel(MX, info, ChannelName) ->
-    ok.
-        
-
-pool(MX, register, PoolName, Client) ->
-    ok;
-
-pool(MX, set, PoolKey, Opts) ->
-    ok.
-
-pool(MX, unregister, PoolKey) ->
-    ok;
-
-pool(MX, info, PoolName) ->
+client(leave, ClientKey, PoolName) ->
     ok.
 
 
-send(MX, ClientKey, ClientTo, Message) ->
-    ok.
-
-send(MX, ChannelKey, Message) ->
+channel(register, ChannelName, Client) ->
     ok;
 
-send(MX, PoolKey, Message) -> 
+channel(set, ChannelKey, Opts) ->
+    ok.
+
+channel(unregister, ChannelKey) ->
+    ok;
+
+channel(info, ChannelName) ->
     ok.
 
 
-control(MX, ControlKey, Cmd) ->
+pool(register, PoolName, Client) ->
+    ok;
+
+pool(set, PoolKey, Opts) ->
+    ok.
+
+pool(unregister, PoolKey) ->
+    ok;
+
+pool(info, PoolName) ->
+    ok.
+
+
+send(<<$*, ClientKey/binary>>, ClientTo, Message) ->
+    ok.
+
+send(<<$#, ChannelKey/binary>>, Message) ->
+    ok;
+
+send(<<$@, PoolKey/binary>>, Message) ->
+    ok.
+
+
+control(ControlKey, Cmd) ->
     ok.
 
 %%--------------------------------------------------------------------
@@ -208,6 +224,32 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_call({register, Client}, _From, State) ->
+    ClientHash  = erlang:md5(Client),
+    ClientKey   = <<$*, ClientHash/binary>>,
+    C = #mx_table_client{
+            name     = Client,
+            key      = ClientKey,
+            channels = [],
+            handler  = offline
+        },
+    R = mnesia:transaction(fun() -> mnesia:write(C) end),
+    {reply, R, State};
+
+handle_call({unregister, ClientKey}, _From, State) ->
+    R = mnesia:transaction(fun() -> mnesia:delete({mx_table_client, ClientKey}) end),
+    {reply, R, State};
+
+handle_call({subscribe, ClientKey, ChanneName}, _From, State) ->
+    {reply, ok, State};
+
+handle_call({unsubscribe, ClientKey, ChanneName}, _From, State) ->
+    {reply, ok, State};
+
+handle_call({info, ClientKey}, _From, State) ->
+    Client = mnesia:dirty_read(mx_table_client, ClientKey),
+    {reply, Client, State};
+
 
 handle_call(Request, _From, State) ->
     ?ERR("unhandled call: ~p", [Request]),
