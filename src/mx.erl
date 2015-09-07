@@ -119,8 +119,8 @@ client(register, Client) when is_binary(Client)->
 client(unregister, <<$*,ClientKey/binary>>) ->
     gen_server:call(?MODULE, {unregister, ClientKey});
 
-client(info, Client) ->
-    ok.
+client(info, ClientKey) ->
+    gen_server:call(?MODULE, {info, ClientKey}).
 
 client(set, ClientKey, Opts) ->
     ok;
@@ -233,8 +233,13 @@ handle_call({register, Client}, _From, State) ->
             channels = [],
             handler  = offline
         },
-    R = mnesia:transaction(fun() -> mnesia:write(C) end),
-    {reply, R, State};
+
+    case mnesia:transaction(fun() -> mnesia:write(C) end) of
+        {aborted, E} ->
+            {reply, E, State};
+        _ ->
+            {reply, {clientkey, ClientKey}, State}
+    end;
 
 handle_call({unregister, ClientKey}, _From, State) ->
     R = mnesia:transaction(fun() -> mnesia:delete({mx_table_client, ClientKey}) end),

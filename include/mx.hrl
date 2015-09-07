@@ -19,6 +19,8 @@
 %% THE SOFTWARE.
 %%
 
+-ifndef(MX_HRL).
+-define(MX_HRL, true).
 
 % queue limits
 -define(MXQUEUE_LOW_THRESHOLD,      0.6).
@@ -29,18 +31,32 @@
 -define(MXQUEUE_PRIO_HIGH,          5).
 -define(MXQUEUE_PRIO_RT,            50).
 
--define(MXMNESIA_TABLES,           [{mx_table_client,[]}, {mx_table_channel,[]}, {mx_table_defer, []}]).
+-define(MXMNESIA_TABLES,
+    [{mx_table_client, [{type, set},
+                        {disc_copies, [node()]},
+                        {record_name, mx_table_client},
+                        {attributes, record_info(fields, mx_table_client)} ]},
+
+    {mx_table_channel,[{type, set},
+                        {disc_copies, [node()]},
+                        {record_name, mx_table_channel},
+                        {attributes, record_info(fields, mx_table_channel)} ]},
+
+    {mx_table_defer, [{type, set},
+                        {disc_copies, [node()]},
+                        {record_name, mx_table_defer},
+                        {attributes, record_info(fields, mx_table_defer)} ]} ]).
 
 -record(mx_table_client, {
-    name        :: binary(),
     key         :: binary(),
+    name        :: binary(),
     channels    :: list(),
     handler     :: pid() | offline      % who manage the client (for recieving messages)
     }).
 
 -record(mx_table_channel, {
-    name        :: binary(),
     key         :: binary(),
+    name        :: binary(),
     client,                             % owner. publisher
     subscribers :: list(),              % list of subscribed clients
     handler     :: pid(),               % who manage the last mile to the client (WebSocket, email, sms etc.)
@@ -56,3 +72,5 @@
     channel,                            % message for the subscribers
     message
     }).
+
+-endif. % MX_HRL

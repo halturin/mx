@@ -45,4 +45,5 @@ run2: compile
 	@$(ERL) -name mxnode02@127.0.0.1\
                 -pa ebin deps/*/ebin  ../deps/*/ebin ../*/ebin\
                 -s mx_helper\
+                -mxmaster mxnode01@127.0.0.1\
                 -setcookie devcook -Ddebug=true

@@ -53,6 +53,16 @@ start() ->
             {lager_file_backend, [{file, "./log/run.log"}, {level, debug}]}
         ]
     ),
+
+
+    case init:get_argument(mxmaster) of
+        {ok, [[MasterNode|_]]} when is_list(MasterNode) ->
+            application:load(mx_mnesia),
+            application:set_env(mx_mnesia, master, list_to_atom(MasterNode));
+        _ ->
+            pass
+    end,
+
     ok = ensure_started(?APPS),
 
     ok = sync:go(),
