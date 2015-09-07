@@ -38,7 +38,8 @@
 %% records
 -record(state, {
             id      :: non_neg_integer,
-            config  :: list()
+            config  :: list(),
+            q       % queue
             }).
 
 %% includes

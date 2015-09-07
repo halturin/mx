@@ -73,7 +73,7 @@ init([]) ->
             gen_server:cast(self(), master)
     end,
 
-    {ok, #state{status = []}}.
+    {ok, #state{status = starting}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -89,6 +89,9 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_call(status, _, #state{status = S} = State) ->
+    {reply, S, State};
+
 handle_call(Request, _From, State) ->
     ?ERR("unhandled call: ~p", [Request]),
     {reply, ok, State}.
@@ -116,7 +119,7 @@ handle_cast(master, State) ->
     ok = mnesia:start(),
     [create_table(T,A) || {T,A} <- ?MXMNESIA_TABLES],
     mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
-    {noreply, State};
+    {noreply, State#state{status = running}};
 
 
 handle_cast({master, Master}, State) ->
@@ -136,7 +139,7 @@ handle_cast({master, Master}, State) ->
     mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
 
 
-    {noreply, State};
+    {noreply, State#state{status = running}};
 
 
 handle_cast(Msg, State) ->

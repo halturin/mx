@@ -34,9 +34,9 @@
 -type mxq() :: #mxq{}.
 -export_type([mxq/0]).
 
--export([create/1, put/2, get/1, pop/1, is_empty/1, len/1]).
+-export([new/1, put/2, get/1, pop/1, is_empty/1, len/1]).
 
-create(QueueName) ->
+new(QueueName) ->
     #mxq{
         name            = QueueName,
         alarm           = fun(_) -> ok end % FIXME!!!
@@ -44,6 +44,7 @@ create(QueueName) ->
 
 put(_Message, #mxq{queue = Q, length = L, length_limit = LM, alarm = F} = MXQ) when L > LM ->
     % exceed the limit. drop message.
+    % FIXME!!! save to the mnesia storage.
     MXQ#mxq{alarm   = F({mxq_alarm_queue_length_limit, Q})};
 
 put(Message, #mxq{queue = Q, length = L, threshold_high = LH, alarm = F} = MXQ) when L > LH ->

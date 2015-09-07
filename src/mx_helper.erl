@@ -54,10 +54,9 @@ start() ->
         ]
     ),
 
-
+    application:load(mx_mnesia),
     case init:get_argument(mxmaster) of
         {ok, [[MasterNode|_]]} when is_list(MasterNode) ->
-            application:load(mx_mnesia),
             application:set_env(mx_mnesia, master, list_to_atom(MasterNode));
         _ ->
             pass

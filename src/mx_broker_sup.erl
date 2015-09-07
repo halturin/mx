@@ -51,8 +51,6 @@ init([]) ->
         fun(I) ->
             Worker = {mx_broker, I},
             gproc_pool:add_worker(mx_pubsub, Worker, I),
-
-
             {Worker, {mx_broker, start_link, [I, Opts]},
                         permanent, 5000, worker, [mx_broker]}
         end, lists:seq(1, Workers)),
