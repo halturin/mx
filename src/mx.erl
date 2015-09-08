@@ -120,7 +120,7 @@ client(unregister, <<$*,ClientKey/binary>>) ->
     gen_server:call(?MODULE, {unregister_client, ClientKey});
 
 client(info, ClientKey) ->
-    gen_server:call(?MODULE, {info, ClientKey}).
+    gen_server:call(?MODULE, {info_client, ClientKey}).
 
 client(set, ClientKey, Opts) ->
     ok;
@@ -149,9 +149,9 @@ channel(register, {ChannelName, Opts}, ClientKey) when is_list(ChannelName) ->
 channel(register, ChannelName, ClientKey) when is_list(ChannelName) ->
     channel(register, ChannelName, list_to_binary(ClientKey));
 channel(register, {ChannelName, Opts}, ClientKey) when is_binary(ChannelName)->
-    gen_server:call(?MODULE, {register_channel, {ChannelName, Opts}});
+    gen_server:call(?MODULE, {register_channel, {ChannelName, Opts}, ClientKey});
 channel(register, ChannelName, ClientKey) when is_binary(ChannelName)->
-    gen_server:call(?MODULE, {register_channel, ChannelName});
+    gen_server:call(?MODULE, {register_channel, ChannelName, ClientKey});
 
 channel(set, ChannelKey, Opts) ->
     ok.
@@ -159,8 +159,8 @@ channel(set, ChannelKey, Opts) ->
 channel(unregister, ChannelKey) ->
     ok;
 
-channel(info, ChannelName) ->
-    ok.
+channel(info, ChannelKey) ->
+    gen_server:call(?MODULE, {info_channel, ChannelKey}).
 
 
 pool(register, PoolName, Client) ->
@@ -215,10 +215,10 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
     process_flag(trap_exit, true),
-    ok = wait_mnesia(5000), % wait for mnesia 5 sec
-    {ok, N} = mnesia:subscribe({table,mx_table_client,simple}),
-    ?DBG("mnesia subs ~p ~n", [N]),
-
+    ok = wait_for_mnesia(5000), % wait for mnesia 5 sec
+    {ok, _} = mnesia:subscribe({table,mx_table_client,simple}),
+    {atomic, Channels} = mnesia:transaction(fun() -> mnesia:all_keys(mx_table_channel) end),
+    [fun(Q)-> mx_queue:q(Q) end || Q <- Channels],
     {ok, #state{config = []}}.
 
 %%--------------------------------------------------------------------
@@ -261,7 +261,36 @@ handle_call({unregister_client, ClientKey}, _From, State) ->
     {reply, R, State};
 
 handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
-    {reply, ok , State};
+    case mnesia:dirty_read(mx_table_client, ClientKey) of
+        [] ->
+            {reply, unknown_client, State};
+        Client ->
+            ChannelHash = erlang:md5(Channel),
+            ChannelKey  = <<$#, ChannelHash/binary>>,
+            Ch = #mx_table_channel{
+                key     = ChannelHash,
+                name    = Channel,
+                client  = Client,
+                subscribers = [],
+                handler = From,
+                length  = proplists:get_value(length, Opts, ?MXQUEUE_LENGTH_LIMIT),
+                lt      = proplists:get_value(lt, Opts, ?MXQUEUE_LOW_THRESHOLD),
+                ht      = proplists:get_value(ht, Opts, ?MXQUEUE_HIGH_THRESHOLD),
+                priority = proplists:get_value(priority, Opts, ?MXQUEUE_PRIO_NORMAL),
+                defer   = proplists:get_value(defer, Opts, true)
+            },
+
+            Trn =   fun() ->
+                mnesia:write(Ch)
+            end,
+
+            case mnesia:transaction(Trn) of
+                {aborted, E} ->
+                    {reply, E, State};
+                _ ->
+                    {reply, {channelkey, ChannelKey}, State}
+            end
+    end;
 
 handle_call({register_channel, Channel, ClientKey}, From, State) ->
     {reply, ok , State};
@@ -277,10 +306,13 @@ handle_call({unsubscribe, ClientKey, ChanneName}, _From, State) ->
     {reply, ok, State};
 
 
-handle_call({info, ClientKey}, _From, State) ->
+handle_call({info_client, ClientKey}, _From, State) ->
     Client = mnesia:dirty_read(mx_table_client, ClientKey),
     {reply, Client, State};
 
+handle_call({info_channel, ChannelKey}, _From, State) ->
+    Channel = mnesia:dirty_read(mx_table_channel, ChannelKey),
+    {reply, Channel, State};
 
 handle_call(Request, _From, State) ->
     ?ERR("unhandled call: ~p", [Request]),
@@ -349,16 +381,15 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-wait_mnesia(T) when T > 0 ->
+wait_for_mnesia(T) when T > 0 ->
     case gen_server:call(mx_mnesia, status) of
         running ->
             ok;
         X ->
             ?ERR("waiting ~p~n", [X]),
             timer:sleep(100),
-            wait_mnesia(T - 100)
+            wait_for_mnesia(T - 100)
     end;
 
-wait_mnesia(_T) ->
+wait_for_mnesia(_T) ->
     timeout.
-
