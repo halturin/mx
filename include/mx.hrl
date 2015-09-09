@@ -51,6 +51,7 @@
     key         :: binary(),
     name        :: binary(),
     channels    :: list(),              % subscribed to
+    pools       :: list(),              % joined to
     ownerof     :: list(),              % list of keys (channels, pools)
     handler     :: pid() | offline      % who manage the client (for recieving messages)
     }).
@@ -68,9 +69,19 @@
     defer       :: boolean()            % deferrable
     }).
 
+-record(mx_table_pool, {
+    key         :: binary(),
+    name        :: binary(),
+    owners      :: list(),
+    poll        :: list(),              % list of recievers Client|Channels (key)
+    balance     :: rr | hash | random,  % balance type
+    defer       :: boolean()            % deferrable
+    }).
+
 -record(mx_table_defer, {
     from        :: binary(),            % message from (key)
     to          :: binary(),            % message for client|channel|pool (key)
+    fails       :: non_neg_integer(),   % count of sending fails
     message
     }).
 

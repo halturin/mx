@@ -116,24 +116,24 @@ client(register, Client) when is_list(Client)->
 client(register, Client) when is_binary(Client)->
     gen_server:call(?MODULE, {register_client, Client});
 
-client(unregister, <<$*,ClientKey/binary>>) ->
+client(unregister, <<$*,_/binary>> = ClientKey) ->
     gen_server:call(?MODULE, {unregister_client, ClientKey});
 
-client(info, ClientKey) ->
+client(info, <<$*, _/binary>> = ClientKey) ->
     gen_server:call(?MODULE, {info_client, ClientKey}).
 
-client(set, ClientKey, Opts) ->
+client(set, <<$*, _/binary>> = ClientKey, Opts) ->
     ok;
 
 % for channels
-client(subscribe, ClientKey, ChannelName) when is_list(ChannelName)->
+client(subscribe, <<$*, _/binary>> = ClientKey, ChannelName) when is_list(ChannelName)->
     client(subscribe, ClientKey, list_to_binary(ChannelName));
-client(subscribe, <<$*, ClientKey/binary>>, ChannelName) ->
+client(subscribe, <<$*, _/binary>> = ClientKey, ChannelName) ->
     gen_server:call(?MODULE, {subscribe, ClientKey, ChannelName});
 
-client(unsubscribe, ClientKey, ChannelName) when is_list(ChannelName)->
+client(unsubscribe, <<$*, _/binary>> = ClientKey, ChannelName) when is_list(ChannelName)->
     client(unsubscribe, ClientKey, list_to_binary(ChannelName));
-client(unsubscribe, ClientKey, ChannelName) when is_binary(ChannelName)->
+client(unsubscribe, <<$*, _/binary>> = ClientKey, ChannelName) when is_binary(ChannelName)->
     gen_server:call(?MODULE, {unsubscribe, ClientKey, ChannelName});
 
 % for pools
@@ -156,10 +156,10 @@ channel(register, ChannelName, ClientKey) when is_binary(ChannelName)->
 channel(set, ChannelKey, Opts) ->
     ok.
 
-channel(unregister, ChannelKey) ->
-    ok;
+channel(unregister, <<$#,_/binary>> = ChannelKey) ->
+    gen_server:call(?MODULE, {unregister_channel, ChannelKey});
 
-channel(info, ChannelKey) ->
+channel(info, <<$#,_/binary>> = ChannelKey) ->
     gen_server:call(?MODULE, {info_channel, ChannelKey}).
 
 
@@ -245,6 +245,7 @@ handle_call({register_client, Client}, From, State) ->
             key      = ClientKey,
             channels = [],
             ownerof  = [],
+            pools    = [],
             handler  = From
         },
 
@@ -260,11 +261,14 @@ handle_call({register_client, Client}, From, State) ->
     end;
 
 handle_call({unregister_client, ClientKey}, _From, State) ->
+    ?INFO("ClientKey: ~p", [ClientKey]),
     case mnesia:dirty_read(mx_table_client, ClientKey) of
         [] ->
             {reply, unknown_client, State};
-        Client ->
-            [ unsubscribe_client(Ch, Client) || Ch <- Client#mx_table_client.channels],
+        [Client|_] ->
+            [unsubscribe_client(Ch, Client) || Ch <- Client#mx_table_client.channels],
+            [leave_client(P, Client) || P <- Client#mx_table_client.pools],
+            [abandon(I, Client) || I <- Client#mx_table_client.ownerof],
 
             R = mnesia:transaction(fun() -> mnesia:delete({mx_table_client, ClientKey}) end),
             {reply, R, State}
@@ -278,16 +282,16 @@ handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
             ChannelHash = erlang:md5(Channel),
             ChannelKey  = <<$#, ChannelHash/binary>>,
             Ch = #mx_table_channel{
-                key     = ChannelKey,
-                name    = Channel,
-                owners  = [Client#mx_table_client.key],
+                key         = ChannelKey,
+                name        = Channel,
+                owners      = [Client#mx_table_client.key],
                 subscribers = [],
-                handler = From,
-                length  = proplists:get_value(length, Opts, ?MXQUEUE_LENGTH_LIMIT),
-                lt      = proplists:get_value(lt, Opts, ?MXQUEUE_LOW_THRESHOLD),
-                ht      = proplists:get_value(ht, Opts, ?MXQUEUE_HIGH_THRESHOLD),
-                priority = proplists:get_value(priority, Opts, ?MXQUEUE_PRIO_NORMAL),
-                defer   = proplists:get_value(defer, Opts, true)
+                handler     = From,
+                length      = proplists:get_value(length, Opts, ?MXQUEUE_LENGTH_LIMIT),
+                lt          = proplists:get_value(lt, Opts, ?MXQUEUE_LOW_THRESHOLD),
+                ht          = proplists:get_value(ht, Opts, ?MXQUEUE_HIGH_THRESHOLD),
+                priority    = proplists:get_value(priority, Opts, ?MXQUEUE_PRIO_NORMAL),
+                defer       = proplists:get_value(defer, Opts, true)
             },
 
             Trn =   fun() ->
@@ -300,13 +304,36 @@ handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
                 {aborted, E} ->
                     {reply, E, State};
                 _ ->
-                    [{?MODULE, Node} ! {new_channel, ChannelKey} || Node <- mx_mnesia:nodes()],
+                    [{?MODULE, Node} ! {channel_added, ChannelKey} || Node <- mx_mnesia:nodes()],
                     {reply, {channelkey, ChannelKey}, State}
             end
     end;
 
 handle_call({unregister_channel, ChannelKey}, From, State) ->
-    {reply, ok , State};
+    case mnesia:dirty_read(mx_table_channel, ChannelKey) of
+        [] ->
+            {reply, unknown_channel , State};
+        [Channel|_] ->
+            % remove subscriptions
+            lists:map(fun(ClientKey) ->
+                mnesia:dirty_read(mx_table_client, ClientKey),
+                ClientChannels = lists:delete(ChannelKey, Channel#mx_table_client.channels),
+                UpdatedClient = Channel#mx_table_client{channels = ClientChannels},
+                mnesia:transaction(fun() -> mnesia:write(UpdatedClient) end)
+            end, Channel#mx_table_channel.subscribers),
+            % remove owning
+            lists:map(fun(ClientKey) ->
+                [Client|_] = mnesia:dirty_read(mx_table_client, ClientKey),
+                ClientOwnerOf = lists:delete(ChannelKey, Client#mx_table_client.ownerof),
+                UpdatedClient = Client#mx_table_client{ownerof = ClientOwnerOf},
+                mnesia:transaction(fun() -> mnesia:write(UpdatedClient) end)
+            end, Channel#mx_table_channel.owners),
+            % remove channel itself
+            mnesia:transaction(fun() -> mnesia:delete({mx_table_channel, ChannelKey}) end),
+            % manage channel's queue via self casting
+            [{?MODULE, Node} ! {channel_removed, ChannelKey} || Node <- mx_mnesia:nodes()],
+            {reply, ok , State}
+    end;
 
 
 handle_call({subscribe, ClientKey, ChanneName}, _From, State) ->
@@ -317,12 +344,20 @@ handle_call({unsubscribe, ClientKey, ChanneName}, _From, State) ->
 
 
 handle_call({info_client, ClientKey}, _From, State) ->
-    Client = mnesia:dirty_read(mx_table_client, ClientKey),
-    {reply, Client, State};
+    case mnesia:dirty_read(mx_table_client, ClientKey) of
+        [] ->
+            {reply, unknown_client, State};
+        [Client|_] ->
+            {reply, Client, State}
+    end;
 
 handle_call({info_channel, ChannelKey}, _From, State) ->
-    Channel = mnesia:dirty_read(mx_table_channel, ChannelKey),
-    {reply, Channel, State};
+    case mnesia:dirty_read(mx_table_channel, ChannelKey) of
+        [] ->
+            {reply, unknown_channel, State};
+        [Channel|_] ->
+            {reply, Channel, State}
+    end;
 
 handle_call(Request, _From, State) ->
     ?ERR("unhandled call: ~p", [Request]),
@@ -353,9 +388,17 @@ handle_cast(Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info({new_channel, ChannelKey}, State) ->
+handle_info({channel_added, ChannelKey}, State) ->
     %% create or update queue for the channel
     mx_queue:q(ChannelKey),
+    {noreply, State};
+
+handle_info({channel_removed, ChannelKey}, State) ->
+    ?ERR("unimplemented removing channel: ~p", [ChannelKey]),
+    {noreply, State};
+
+handle_info({channel_updated, ChannelKey}, State) ->
+    ?ERR("unimplemented updating channel: ~p", [ChannelKey]),
     {noreply, State};
 
 handle_info(Info, State) ->
@@ -407,8 +450,35 @@ unsubscribe_client(ChannelKey, Client) when is_record(Client, mx_table_client) -
     case mnesia:dirty_read(mx_table_channel, ChannelKey) of
         [] ->
             ok;
-        Channel ->
+        [Channel|_] ->
             Subs = lists:delete(Client#mx_table_client.key, Channel#mx_table_channel.subscribers),
             UpdatedChannel = Channel#mx_table_channel{subscribers = Subs},
-            mnesia:transaction(fun() -> mnesia:write(UpdatedChannel) end)
+            mnesia:transaction(fun() -> mnesia:write(UpdatedChannel) end),
+            [{?MODULE, Node} ! {channel_updated, ChannelKey} || Node <- mx_mnesia:nodes()],
+            ok
+    end.
+
+leave_client(PoolKey, Client) when is_record(Client, mx_table_client) ->
+    ?ERR("unimplemented leave_client function"),
+    ok.
+
+abandon(<<$@,_/binary>> = PoolKey, Client) when is_record(Client, mx_table_client) ->
+    ?ERR("unimplemented abandon pool function"),
+    ok;
+
+abandon(<<$#,_/binary>> = ChannelKey, Client) when is_record(Client, mx_table_client) ->
+    case mnesia:dirty_read(mx_table_channel, ChannelKey) of
+        [] ->
+            ok;
+        [Channel|_] ->
+            case lists:delete(Client#mx_table_client.key, Channel#mx_table_channel.owners) of
+                [] ->
+                    mnesia:transaction(fun() -> mnesia:delete({mx_table_channel, ChannelKey}) end),
+                    [{?MODULE, Node} ! {channel_removed, ChannelKey} || Node <- mx_mnesia:nodes()],
+                    ok;
+                Owners ->
+                    UpdatedChannel = Channel#mx_table_channel{owners = Owners},
+                    mnesia:transaction(fun() ->mnesia:write(UpdatedChannel) end),
+                    ok
+            end
     end.
