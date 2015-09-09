@@ -53,7 +53,7 @@ q(ChannelKey) ->
     case mnesia:dirty_read(mx_table_channel, ChannelKey) of
         [] ->
             unknown_channel;
-        Channel ->
+        [Channel|_] ->
             gen_server:call(?MODULE, {new, Channel})
     end.
 
@@ -95,8 +95,8 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
     process_flag(trap_exit, true),
-    ets:new(table_queues, [named_table, ordered_set]),
-    ets:new(table_nonempty_queues, [named_table, ordered_set]),
+    ets:new(mx_table_queues, [named_table, ordered_set]),
+    ets:new(mx_table_nonempty_queues, [named_table, ordered_set]),
     {ok, #state{status = starting}}.
 
 %%--------------------------------------------------------------------
@@ -114,9 +114,10 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({new, Channel}, _From, State) ->
-    Q = case ets:lookup(table_queues, Channel#mx_table_channel.key) of
+    Q = case ets:lookup(mx_table_queues, Channel#mx_table_channel.key) of
         [] ->
-        #mxq{
+            ?ERR("@@@@@@@Channel New queue"),
+            #mxq{
                 name            = Channel#mx_table_channel.key,
                 length_limit    = Channel#mx_table_channel.length,
                 threshold_low   = Channel#mx_table_channel.lt,
@@ -124,7 +125,8 @@ handle_call({new, Channel}, _From, State) ->
                 defer           = Channel#mx_table_channel.defer,
                 alarm           = alarm()
             };
-        Queue ->
+        [{ChannelKey, Queue}|_] ->
+            ?ERR("@@@@@@@Channel Update queue: ~p", [Queue]),
             Queue#mxq{
                 length_limit    = Channel#mx_table_channel.length,
                 threshold_low   = Channel#mx_table_channel.lt,
@@ -134,38 +136,38 @@ handle_call({new, Channel}, _From, State) ->
             }
     end,
 
-    ets:insert(table_queues, {Channel#mx_table_channel.key, Q}),
+    ets:insert(mx_table_queues, {Channel#mx_table_channel.key, Q}),
     {reply, ok, State};
 
 handle_call({put, Message, ChannelKey}, _From, State) ->
-    case ets:lookup(table_queues, ChannelKey) of
+    case ets:lookup(mx_table_queues, ChannelKey) of
         [] ->
             {reply, unknown_channel, State};
         [Queue] ->
             Q = mxq_put(Message, Queue#mxq.queue),
-            ets:insert(table_queues, {ChannelKey, Q}),
+            ets:insert(mx_table_queues, {ChannelKey, Q}),
             {reply, ok, State}
     end;
 
 handle_call({get, ChannelKey}, _From, State) ->
-    case ets:lookup(table_queues, ChannelKey) of
+    case ets:lookup(mx_table_queues, ChannelKey) of
         [] ->
             {reply, unknown_channel, State};
         [Queue] when Queue#mxq.length > 0 ->
             {Message, Q} = mxq_get(Queue#mxq.queue),
-            ets:insert(table_queues, {ChannelKey, Q}),
+            ets:insert(mx_table_queues, {ChannelKey, Q}),
             {reply, Message, State};
         _ ->
             {reply, empty, State}
     end;
 
 handle_call({pop, ChannelKey}, _From, State) ->
-    case ets:lookup(table_queues, ChannelKey) of
+    case ets:lookup(mx_table_queues, ChannelKey) of
         [] ->
             {reply, unknown_channel, State};
         [Queue] when Queue#mxq.length > 0 ->
             {Message, Q} = mxq_pop(Queue#mxq.queue),
-            ets:insert(table_queues, {ChannelKey, Q}),
+            ets:insert(mx_table_queues, {ChannelKey, Q}),
             {reply, Message, State};
         _ ->
             {reply, empty, State}
@@ -173,7 +175,7 @@ handle_call({pop, ChannelKey}, _From, State) ->
 
 
 handle_call(channels, _From, State) ->
-    Channels = ets:foldl(fun(X) -> X end, [], table_nonempty_queues),
+    Channels = ets:foldl(fun(X) -> X end, [], mx_table_nonempty_queues),
     {reply, Channels, State};
 
 handle_call(Request, _From, State) ->
@@ -257,7 +259,7 @@ mxq_put(Message, #mxq{name = N, queue = Q, length = L, alarm = F} = MXQ) when L 
     MXQ1 = MXQ#mxq{queue   = queue:in(Message, Q),
             length  = L + 1,
             alarm   = F({alarm_has_message, Q})},
-    ets:insert(table_nonempty_queues, N),
+    ets:insert(mx_table_nonempty_queues, N),
     MXQ1;
 
 mxq_put(Message, #mxq{queue = Q, length = L} = MXQ) ->
@@ -266,7 +268,7 @@ mxq_put(Message, #mxq{queue = Q, length = L} = MXQ) ->
 
 
 mxq_get(#mxq{name = N, length = L} = MXQ) when L == 0 ->
-    ets:delete(table_nonempty_queues, N),
+    ets:delete(mx_table_nonempty_queues, N),
     {empty, MXQ};
 
 mxq_get(#mxq{queue = Q, length = L, alarm = F} = MXQ) ->
@@ -278,7 +280,7 @@ mxq_get(#mxq{queue = Q, length = L, alarm = F} = MXQ) ->
         }}.
 
 mxq_pop(#mxq{name = N, length = L} = MXQ) when L == 0 ->
-    ets:delete(table_nonempty_queues, N),
+    ets:delete(mx_table_nonempty_queues, N),
     {empty, MXQ};
 
 mxq_pop(#mxq{queue = Q, length = L, alarm = F} = MXQ) ->

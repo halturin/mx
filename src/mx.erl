@@ -147,7 +147,7 @@ client(leave, ClientKey, PoolName) ->
 channel(register, {ChannelName, Opts}, ClientKey) when is_list(ChannelName) ->
     channel(register, {list_to_binary(ChannelName), Opts}, ClientKey);
 channel(register, ChannelName, ClientKey) when is_list(ChannelName) ->
-    channel(register, ChannelName, list_to_binary(ClientKey));
+    channel(register, {list_to_binary(ChannelName),[]}, ClientKey);
 channel(register, {ChannelName, Opts}, ClientKey) when is_binary(ChannelName)->
     gen_server:call(?MODULE, {register_channel, {ChannelName, Opts}, ClientKey});
 channel(register, ChannelName, ClientKey) when is_binary(ChannelName)->
@@ -216,7 +216,7 @@ start_link() ->
 init([]) ->
     process_flag(trap_exit, true),
     ok = wait_for_mnesia(5000), % wait for mnesia 5 sec
-    {ok, _} = mnesia:subscribe({table,mx_table_client,simple}),
+    {ok, _} = mnesia:subscribe({table,mx_table_channel,simple}),
     {atomic, ChannelKeys} = mnesia:transaction(fun() -> mnesia:all_keys(mx_table_channel) end),
     [fun(C)-> mx_queue:q(C) end || C <- ChannelKeys],
     {ok, #state{config = []}}.
@@ -292,9 +292,6 @@ handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
             end
     end;
 
-handle_call({register_channel, Channel, ClientKey}, From, State) ->
-    {reply, ok , State};
-
 handle_call({unregister_channel, ChannelKey}, From, State) ->
     {reply, ok , State};
 
@@ -343,7 +340,7 @@ handle_cast(Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info({mnesia_table_event,{write, Channel, _}}, State) ->
+handle_info({mnesia_table_event,{write, Channel, _}}, State) when is_record(Channel, mx_table_channel) ->
     %% create or update queue for the channel
     mx_queue:q(Channel#mx_table_channel.key),
     {noreply, State};
