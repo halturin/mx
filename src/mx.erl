@@ -217,8 +217,8 @@ init([]) ->
     process_flag(trap_exit, true),
     ok = wait_for_mnesia(5000), % wait for mnesia 5 sec
     {ok, _} = mnesia:subscribe({table,mx_table_client,simple}),
-    {atomic, Channels} = mnesia:transaction(fun() -> mnesia:all_keys(mx_table_channel) end),
-    [fun(Q)-> mx_queue:q(Q) end || Q <- Channels],
+    {atomic, ChannelKeys} = mnesia:transaction(fun() -> mnesia:all_keys(mx_table_channel) end),
+    [fun(C)-> mx_queue:q(C) end || C <- ChannelKeys],
     {ok, #state{config = []}}.
 
 %%--------------------------------------------------------------------
@@ -344,9 +344,8 @@ handle_cast(Msg, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info({mnesia_table_event,{write, Channel, _}}, State) ->
-    % {mx_table_channel,...}
-
-    % mx_queue:new(Ch)
+    %% create or update queue for the channel
+    mx_queue:q(Channel#mx_table_channel.key),
     {noreply, State};
 
 handle_info(Info, State) ->
