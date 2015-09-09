@@ -32,10 +32,16 @@
          terminate/2,
          code_change/3]).
 
+-export([nodes/0]).
+
 -include_lib("include/mx.hrl").
 -include_lib("include/log.hrl").
 
 -record(state, {status}).
+
+nodes() ->
+    gen_server:call(?MODULE, nodes).
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the server
@@ -91,6 +97,10 @@ init([]) ->
 %%--------------------------------------------------------------------
 handle_call(status, _, #state{status = S} = State) ->
     {reply, S, State};
+
+handle_call(nodes, _From, State) ->
+    Nodes = mnesia:system_info(running_db_nodes),
+    {reply, Nodes, State};
 
 handle_call(Request, _From, State) ->
     ?ERR("unhandled call: ~p", [Request]),

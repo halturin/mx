@@ -42,7 +42,7 @@
                         {record_name, mx_table_channel},
                         {attributes, record_info(fields, mx_table_channel)} ]},
 
-    {mx_table_defer, [{type, set},
+    {mx_table_defer, [{type, bag},
                         {disc_copies, [node()]},
                         {record_name, mx_table_defer},
                         {attributes, record_info(fields, mx_table_defer)} ]} ]).
@@ -50,14 +50,15 @@
 -record(mx_table_client, {
     key         :: binary(),
     name        :: binary(),
-    channels    :: list(),
+    channels    :: list(),              % subscribed to
+    ownerof     :: list(),              % list of keys (channels, pools)
     handler     :: pid() | offline      % who manage the client (for recieving messages)
     }).
 
 -record(mx_table_channel, {
     key         :: binary(),
     name        :: binary(),
-    client,                             % owner. publisher
+    owners      :: list(),              % owners (who can publish here)
     subscribers :: list(),              % list of subscribed clients
     handler     :: pid(),               % who manage the last mile to the client (WebSocket, email, sms etc.)
     length      :: non_neg_integer(),   % max length of queue
@@ -68,8 +69,8 @@
     }).
 
 -record(mx_table_defer, {
-    client,                             % message for direct sending to the client
-    channel,                            % message for the subscribers
+    from        :: binary(),            % message from (key)
+    to          :: binary(),            % message for client|channel|pool (key)
     message
     }).
 

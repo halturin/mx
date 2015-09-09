@@ -216,9 +216,11 @@ start_link() ->
 init([]) ->
     process_flag(trap_exit, true),
     ok = wait_for_mnesia(5000), % wait for mnesia 5 sec
-    {ok, _} = mnesia:subscribe({table,mx_table_channel,simple}),
-    {atomic, ChannelKeys} = mnesia:transaction(fun() -> mnesia:all_keys(mx_table_channel) end),
-    [fun(C)-> mx_queue:q(C) end || C <- ChannelKeys],
+    {atomic, ok} = mnesia:transaction(fun() -> 
+        ChannelKeys = mnesia:all_keys(mx_table_channel),
+        [mx_queue:q(C) || C <- ChannelKeys],
+        ok
+    end),
     {ok, #state{config = []}}.
 
 %%--------------------------------------------------------------------
@@ -242,6 +244,7 @@ handle_call({register_client, Client}, From, State) ->
             name     = Client,
             key      = ClientKey,
             channels = [],
+            ownerof  = [],
             handler  = From
         },
 
@@ -257,20 +260,27 @@ handle_call({register_client, Client}, From, State) ->
     end;
 
 handle_call({unregister_client, ClientKey}, _From, State) ->
-    R = mnesia:transaction(fun() -> mnesia:delete({mx_table_client, ClientKey}) end),
-    {reply, R, State};
+    case mnesia:dirty_read(mx_table_client, ClientKey) of
+        [] ->
+            {reply, unknown_client, State};
+        Client ->
+            [ unsubscribe_client(Ch, Client) || Ch <- Client#mx_table_client.channels],
+
+            R = mnesia:transaction(fun() -> mnesia:delete({mx_table_client, ClientKey}) end),
+            {reply, R, State}
+    end;
 
 handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
     case mnesia:dirty_read(mx_table_client, ClientKey) of
         [] ->
             {reply, unknown_client, State};
-        Client ->
+        [Client|_] ->
             ChannelHash = erlang:md5(Channel),
             ChannelKey  = <<$#, ChannelHash/binary>>,
             Ch = #mx_table_channel{
-                key     = ChannelHash,
+                key     = ChannelKey,
                 name    = Channel,
-                client  = Client,
+                owners  = [Client#mx_table_client.key],
                 subscribers = [],
                 handler = From,
                 length  = proplists:get_value(length, Opts, ?MXQUEUE_LENGTH_LIMIT),
@@ -281,13 +291,16 @@ handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
             },
 
             Trn =   fun() ->
-                mnesia:write(Ch)
+                mnesia:write(Ch),
+                Cl = Client#mx_table_client{ownerof = [ChannelKey| Client#mx_table_client.ownerof]},
+                mnesia:write(Cl)
             end,
 
             case mnesia:transaction(Trn) of
                 {aborted, E} ->
                     {reply, E, State};
                 _ ->
+                    [{?MODULE, Node} ! {new_channel, ChannelKey} || Node <- mx_mnesia:nodes()],
                     {reply, {channelkey, ChannelKey}, State}
             end
     end;
@@ -340,9 +353,9 @@ handle_cast(Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info({mnesia_table_event,{write, Channel, _}}, State) when is_record(Channel, mx_table_channel) ->
+handle_info({new_channel, ChannelKey}, State) ->
     %% create or update queue for the channel
-    mx_queue:q(Channel#mx_table_channel.key),
+    mx_queue:q(ChannelKey),
     {noreply, State};
 
 handle_info(Info, State) ->
@@ -389,3 +402,13 @@ wait_for_mnesia(T) when T > 0 ->
 
 wait_for_mnesia(_T) ->
     timeout.
+
+unsubscribe_client(ChannelKey, Client) when is_record(Client, mx_table_client) ->
+    case mnesia:dirty_read(mx_table_channel, ChannelKey) of
+        [] ->
+            ok;
+        Channel ->
+            Subs = lists:delete(Client#mx_table_client.key, Channel#mx_table_channel.subscribers),
+            UpdatedChannel = Channel#mx_table_channel{subscribers = Subs},
+            mnesia:transaction(fun() -> mnesia:write(UpdatedChannel) end)
+    end.

@@ -116,7 +116,6 @@ init([]) ->
 handle_call({new, Channel}, _From, State) ->
     Q = case ets:lookup(mx_table_queues, Channel#mx_table_channel.key) of
         [] ->
-            ?ERR("@@@@@@@Channel New queue"),
             #mxq{
                 name            = Channel#mx_table_channel.key,
                 length_limit    = Channel#mx_table_channel.length,
@@ -126,7 +125,6 @@ handle_call({new, Channel}, _From, State) ->
                 alarm           = alarm()
             };
         [{ChannelKey, Queue}|_] ->
-            ?ERR("@@@@@@@Channel Update queue: ~p", [Queue]),
             Queue#mxq{
                 length_limit    = Channel#mx_table_channel.length,
                 threshold_low   = Channel#mx_table_channel.lt,
