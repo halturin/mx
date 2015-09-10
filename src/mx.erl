@@ -94,7 +94,6 @@
          pool/2,
          pool/3,
          send/2,
-         send/3,
          control/2
         ]).
 
@@ -176,14 +175,29 @@ pool(info, PoolName) ->
     ok.
 
 
-send(<<$*, ClientKey/binary>>, ClientTo, Message) ->
-    ok.
+send(<<$*, _/binary>> = ClientKeyTo, Message) ->
+    case mnesia:dirty_read(mx_table_client, ClientKeyTo) of
+        [] ->
+            unknown_client;
+        [ClientTo|_] ->
+            cast({send, ClientTo, Message})
+    end;
 
-send(<<$#, ChannelKey/binary>>, Message) ->
-    ok;
+send(<<$#, _/binary>> = ChannelKeyTo, Message) ->
+    case mnesia:dirty_read(mx_table_channel, ChannelKeyTo) of
+        [] ->
+            unknown_channel;
+        [ChannelTo|_] ->
+            cast({send, ChannelTo, Message})
+    end;
 
-send(<<$@, PoolKey/binary>>, Message) ->
-    ok.
+send(<<$@, _/binary>> = PoolKeyTo, Message) ->
+    case mnesia:dirty_read(mx_table_pool, PoolKeyTo) of
+        [] ->
+            unknown_pool;
+        [PoolTo|_] ->
+            cast({send, PoolTo, Message})
+    end.
 
 
 control(ControlKey, Cmd) ->

@@ -49,22 +49,22 @@ new(QueueName) ->
 put(_Message, #mxq{queue = Q, length = L, length_limit = LM, alarm = F} = MXQ) when L > LM ->
     % exceed the limit. drop message.
     % FIXME!!! save to the mnesia storage.
-    MXQ#mxq{alarm   = F({mxq_alarm_queue_length_limit, Q})};
+    MXQ#mxq{alarm   = F(mxq_alarm_queue_length_limit, Q)};
 
 put(Message, #mxq{queue = Q, length = L, threshold_high = LH, alarm = F} = MXQ) when L > LH ->
     MXQ#mxq{queue   = queue:in(Message, Q),
             length  = L + 1,
-            alarm   = F({mxq_alarm_threshold_high, Q})};
+            alarm   = F(mxq_alarm_threshold_high, Q)};
 
 put(Message, #mxq{queue = Q, length = L, threshold_low = LL, alarm = F} = MXQ) when L > LL ->
     MXQ#mxq{queue   = queue:in(Message, Q),
             length  = L + 1,
-            alarm   = F({mxq_alarm_threshold_low, Q})};
+            alarm   = F(mxq_alarm_threshold_low, Q)};
 
 put(Message, #mxq{queue = Q, length = L, alarm = F} = MXQ) when L == 0 ->
     MXQ#mxq{queue   = queue:in(Message, Q),
             length  = L + 1,
-            alarm   = F({mxq_alarm_has_message, Q})};
+            alarm   = F(mxq_alarm_has_message, Q)};
 
 put(Message, #mxq{queue = Q, length = L} = MXQ) ->
     MXQ#mxq{queue   = queue:in(Message, Q),
@@ -79,7 +79,7 @@ get(#mxq{queue = Q, length = L, alarm = F} = MXQ) ->
     {Message, MXQ#mxq{
         queue   = Q1,
         length  = L - 1,
-        alarm   = F({mxq_alarm_clear, Q})
+        alarm   = F(mxq_alarm_clear, Q)
         }}.
 
 pop(#mxq{length = L} = MXQ) when L == 0 ->
@@ -90,7 +90,7 @@ pop(#mxq{queue = Q, length = L, alarm = F} = MXQ) ->
     {Message, MXQ#mxq{
         queue   = Q1,
         length  = L - 1,
-        alarm   = F({mxq_alarm_clear, Q})
+        alarm   = F(mxq_alarm_clear, Q)
         }}.
 
 is_empty(#mxq{length = 0}) -> true;

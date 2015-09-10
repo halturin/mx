@@ -62,9 +62,6 @@
     owners      :: list(),              % owners (who can publish here)
     subscribers :: list(),              % list of subscribed clients
     handler     :: pid(),               % who manage the last mile to the client (WebSocket, email, sms etc.)
-    length      :: non_neg_integer(),   % max length of queue
-    lt          :: non_neg_integer(),   % low threshold
-    ht          :: non_neg_integer(),   % high threshold
     priority    :: non_neg_integer(),   % priority
     defer       :: boolean()            % deferrable
     }).

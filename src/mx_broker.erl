@@ -36,8 +36,8 @@
 -record(state, {
             id      :: non_neg_integer,
             config  :: list(),
-            queues       % list of queues ()
-            }).
+            queues
+        }).
 
 %% includes
 -include_lib("include/log.hrl").
@@ -74,12 +74,17 @@ start_link(I, Opts) ->
 init([I, Opts]) ->
     process_flag(trap_exit, true),
     gproc_pool:connect_worker(mx_pubsub, {mx_broker, I}),
-    % number of Queues is eq to the number of priorities
-    Q = lists:map(fun(X) -> mx_queue:new(X) end, lists:seq(1, 10)),
+    QueuesTable = list_to_atom("mx_broker_" ++ integer_to_list(I) ++ "_queues"),
+    ets:new(QueuesTable, [named_table, ordered_set]),
+    lists:map(fun(X) ->
+        Q = mx_queue:new(X),
+        ets:insert(QueuesTable,{X, Q})
+    end, lists:seq(1, 10)),
     State = #state{
                 id = I,
                 config = [],
-                queues = Q},
+                queues = QueuesTable
+               },
     {ok, State}.
 
 %%--------------------------------------------------------------------
@@ -137,9 +142,6 @@ handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
                 owners      = [Client#mx_table_client.key],
                 subscribers = [],
                 handler     = From,
-                length      = proplists:get_value(length, Opts, ?MXQUEUE_LENGTH_LIMIT),
-                lt          = proplists:get_value(lt, Opts, ?MXQUEUE_LOW_THRESHOLD),
-                ht          = proplists:get_value(ht, Opts, ?MXQUEUE_HIGH_THRESHOLD),
                 priority    = proplists:get_value(priority, Opts, ?MXQUEUE_PRIO_NORMAL),
                 defer       = proplists:get_value(defer, Opts, true)
             },
@@ -201,6 +203,29 @@ handle_call(Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+-record(mxq,{queue              = queue:new(),
+             name,
+             length             = 0 :: non_neg_integer(), %% current len
+             length_limit       = ?MXQUEUE_LENGTH_LIMIT,
+             threshold_low      = ?MXQUEUE_LOW_THRESHOLD,
+             threshold_high     = ?MXQUEUE_HIGH_THRESHOLD,
+             alarm}).
+
+handle_cast({send, To, Message}, #state{queues = QueuesTable} = State) when is_record(To, mx_table_client) ->
+    ?LOG("Send to client: ~p", [To]),
+    [{1,Q}|_] = ets:lookup(QueuesTable, 1),
+    ?LOG("Send to QQQQQQ: ~p", [Q]),
+    Q1 = mx_queue:put({To#mx_table_client.key, Message}, Q),
+    ets:insert(QueuesTable, {1, Q1}),
+    {noreply, State};
+
+% handle_cast({send, To, Message}, State) when is_record(To, mx_table_channel) ->
+%     ?LOG("Send to channel: ~p", [To]),
+%     {noreply, State};
+
+% handle_cast({send, To, Message}, State) when is_record(To, mx_table_pool) ->
+%     ?LOG("Send to pool: ~p", [To]),
+%     {noreply, State};
 
 handle_cast(Msg, State) ->
     ?ERR("unhandled cast: ~p", [Msg]),
