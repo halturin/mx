@@ -44,9 +44,7 @@ start_link() ->
 init([]) ->
     {ok, { {one_for_one, 5, 10}, [
         ?CHILD(mx_mnesia, worker),
-        ?CHILD(mx_queue, worker),
         ?CHILD(mx, worker),
-        ?CHILD(mx_broker_sup, supervisor),
-        ?CHILD(mx_batch)
+        ?CHILD(mx_broker_sup, supervisor)
     ]} }.
 

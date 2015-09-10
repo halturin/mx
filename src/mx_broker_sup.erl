@@ -55,5 +55,5 @@ init([]) ->
                         permanent, 5000, worker, [mx_broker]}
         end, lists:seq(1, Workers)),
 
-    {ok, { {one_for_all, 5, 10}, Children } }.
+    {ok, { {one_for_one, 5, 10}, Children } }.
 
