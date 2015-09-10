@@ -121,18 +121,8 @@ handle_call({register_client, Client}, From, State) ->
     end;
 
 handle_call({unregister_client, ClientKey}, _From, State) ->
-    ?INFO("ClientKey: ~p", [ClientKey]),
-    case mnesia:dirty_read(mx_table_client, ClientKey) of
-        [] ->
-            {reply, unknown_client, State};
-        [Client|_] ->
-            [unsubscribe_client(Ch, Client) || Ch <- Client#mx_table_client.channels],
-            [leave_client(P, Client) || P <- Client#mx_table_client.pools],
-            [abandon(I, Client) || I <- Client#mx_table_client.ownerof],
-
-            R = mnesia:transaction(fun() -> mnesia:delete({mx_table_client, ClientKey}) end),
-            {reply, R, State}
-    end;
+    R = unregister_client(ClientKey),
+    {reply, R, State};
 
 handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
     case mnesia:dirty_read(mx_table_client, ClientKey) of
@@ -169,28 +159,8 @@ handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
     end;
 
 handle_call({unregister_channel, ChannelKey}, From, State) ->
-    case mnesia:dirty_read(mx_table_channel, ChannelKey) of
-        [] ->
-            {reply, unknown_channel , State};
-        [Channel|_] ->
-            % remove subscriptions
-            lists:map(fun(ClientKey) ->
-                mnesia:dirty_read(mx_table_client, ClientKey),
-                ClientChannels = lists:delete(ChannelKey, Channel#mx_table_client.channels),
-                UpdatedClient = Channel#mx_table_client{channels = ClientChannels},
-                mnesia:transaction(fun() -> mnesia:write(UpdatedClient) end)
-            end, Channel#mx_table_channel.subscribers),
-            % remove owning
-            lists:map(fun(ClientKey) ->
-                [Client|_] = mnesia:dirty_read(mx_table_client, ClientKey),
-                ClientOwnerOf = lists:delete(ChannelKey, Client#mx_table_client.ownerof),
-                UpdatedClient = Client#mx_table_client{ownerof = ClientOwnerOf},
-                mnesia:transaction(fun() -> mnesia:write(UpdatedClient) end)
-            end, Channel#mx_table_channel.owners),
-            % remove channel itself
-            mnesia:transaction(fun() -> mnesia:delete({mx_table_channel, ChannelKey}) end),
-            {reply, ok , State}
-    end;
+    R = unregister_channel(ChannelKey),
+    {reply, R, State};
 
 
 handle_call({subscribe, ClientKey, ChanneName}, _From, State) ->
@@ -201,7 +171,7 @@ handle_call({unsubscribe, ClientKey, ChanneName}, _From, State) ->
 
 
 handle_call({info_client, ClientKey}, _From, State) ->
-    ?LOG("Broker: ~p", [State#state.id]),
+    ?LOG("Broker:~p", [State#state.id]),
     case mnesia:dirty_read(mx_table_client, ClientKey) of
         [] ->
             {reply, unknown_client, State};
@@ -210,7 +180,6 @@ handle_call({info_client, ClientKey}, _From, State) ->
     end;
 
 handle_call({info_channel, ChannelKey}, _From, State) ->
-    ?LOG("Broker: ~p", [State#state.id]),
     case mnesia:dirty_read(mx_table_channel, ChannelKey) of
         [] ->
             {reply, unknown_channel, State};
@@ -282,6 +251,42 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+unregister_client(ClientKey) ->
+        case mnesia:dirty_read(mx_table_client, ClientKey) of
+        [] ->
+            unknown_client;
+        [Client|_] ->
+            [unsubscribe_client(Ch, Client) || Ch <- Client#mx_table_client.channels],
+            [leave_client(P, Client) || P <- Client#mx_table_client.pools],
+            [abandon(I, Client) || I <- Client#mx_table_client.ownerof],
+            mnesia:transaction(fun() -> mnesia:delete({mx_table_client, ClientKey}) end),
+            ok
+    end.
+
+unregister_channel(ChannelKey) ->
+    case mnesia:dirty_read(mx_table_channel, ChannelKey) of
+        [] ->
+            unknown_channel;
+        [Channel|_] ->
+            % remove subscriptions
+            lists:map(fun(ClientKey) ->
+                mnesia:dirty_read(mx_table_client, ClientKey),
+                ClientChannels = lists:delete(ChannelKey, Channel#mx_table_client.channels),
+                UpdatedClient = Channel#mx_table_client{channels = ClientChannels},
+                mnesia:transaction(fun() -> mnesia:write(UpdatedClient) end)
+            end, Channel#mx_table_channel.subscribers),
+            % remove owning
+            lists:map(fun(ClientKey) ->
+                [Client|_] = mnesia:dirty_read(mx_table_client, ClientKey),
+                ClientOwnerOf = lists:delete(ChannelKey, Client#mx_table_client.ownerof),
+                UpdatedClient = Client#mx_table_client{ownerof = ClientOwnerOf},
+                mnesia:transaction(fun() -> mnesia:write(UpdatedClient) end)
+            end, Channel#mx_table_channel.owners),
+            % remove channel itself
+            mnesia:transaction(fun() -> mnesia:delete({mx_table_channel, ChannelKey}) end),
+            ok
+    end.
+
 unsubscribe_client(ChannelKey, Client) when is_record(Client, mx_table_client) ->
     case mnesia:dirty_read(mx_table_channel, ChannelKey) of
         [] ->
@@ -308,8 +313,7 @@ abandon(<<$#,_/binary>> = ChannelKey, Client) when is_record(Client, mx_table_cl
         [Channel|_] ->
             case lists:delete(Client#mx_table_client.key, Channel#mx_table_channel.owners) of
                 [] ->
-                    mnesia:transaction(fun() -> mnesia:delete({mx_table_channel, ChannelKey}) end),
-                    ok;
+                    unregister_channel(ChannelKey);
                 Owners ->
                     UpdatedChannel = Channel#mx_table_channel{owners = Owners},
                     mnesia:transaction(fun() ->mnesia:write(UpdatedChannel) end),
