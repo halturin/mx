@@ -46,6 +46,7 @@ init([]) ->
         ?CHILD(mx_mnesia, worker),
         ?CHILD(mx_queue, worker),
         ?CHILD(mx, worker),
-        ?CHILD(mx_broker_sup, supervisor)
+        ?CHILD(mx_broker_sup, supervisor),
+        ?CHILD(mx_batch)
     ]} }.
 
