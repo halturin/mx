@@ -375,7 +375,6 @@ dispatch(Q, N, HasMessages) ->
 dispatch(QueuesTable) ->
     case    lists:foldl(fun(P, HasMessagesAcc) ->
                 [{P,Q}|_] = ets:lookup(QueuesTable, P),
-                ?DBG("~n~nDispatch priority: ~p", [P]),
                 case dispatch(Q, 11 - P, false) of
                     {Q1, true} ->
                         ets:insert(QueuesTable, {P, Q1}),
@@ -389,7 +388,7 @@ dispatch(QueuesTable) ->
             0; % cast 'dispatch' immediately
         false ->
             ?DBG("Wait for new message..."),
-            5000 % wait 50 ms before 'dispatch casting'
+            5000 % FIXME later. wait 50 ms before 'dispatch casting'
     end.
 
 

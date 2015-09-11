@@ -79,7 +79,8 @@
 -record(mx_table_defer, {
     from        :: binary(),            % message from (key)
     to          :: binary(),            % message for client|channel|pool (key)
-    fails       :: non_neg_integer(),   % count of sending fails
+    fails       = 0 :: non_neg_integer(),   % count of sending fails
+    priority    :: non_neg_integer(),
     message
     }).
 

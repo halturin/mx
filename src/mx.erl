@@ -249,9 +249,29 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_call({register_client, Client}, _From, State) ->
+    R = client(register, Client),
+    {reply, R, State};
+
+handle_call({unregister_client, ClientKey}, _From, State) ->
+    R = client(unregister, ClientKey),
+    {reply, R, State};
+
+handle_call({register_channel, {ChannelName, Opts}, ClientKey}, _From, State) ->
+    R = channel(register, {ChannelName, Opts}, ClientKey),
+    {reply, R, State};
+
+handle_call({register_channel, ChannelName, ClientKey}, _From, State) ->
+    R = channel(register, {ChannelName, []}, ClientKey),
+    {reply, R, State};
+
+handle_call({unregister_channel, ChannelKey}, _From, State) ->
+    R = channel(unregister_channel, ChannelKey),
+    {reply, R, State};
+
 handle_call(Request, _From, State) ->
     ?ERR("unhandled call: ~p", [Request]),
-    {reply, ok, State}.
+    {reply, unknown_request, State}.
 
 %%--------------------------------------------------------------------
 %% @private

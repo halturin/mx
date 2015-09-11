@@ -28,11 +28,12 @@
 -include_lib("include/mx.hrl").
 
 -record(mxq,{queue              = queue:new(),
-             name,
+             name               :: non_neg_integer(),
              length             = 0 :: non_neg_integer(), %% current len
              length_limit       = 10, %?MXQUEUE_LENGTH_LIMIT,
              threshold_low      = 6,  %?MXQUEUE_LOW_THRESHOLD,
              threshold_high     = 8, %?MXQUEUE_HIGH_THRESHOLD,
+             total              = 0, % total messages
              alarm}).
 
 -type mxq() :: #mxq{}.
@@ -40,16 +41,27 @@
 
 
 
-new(QueueName) ->
+new(QueueName) when is_integer(QueueName) ->
     #mxq{
         name            = QueueName,
         alarm           = alarm()
-    }.
+    };
+new(_) ->
+    {error, "non negative integer is expected"}.
 
-put(_Message, #mxq{queue = Q, length = L, length_limit = LM, alarm = F} = MXQ) when L > LM ->
-    % exceed the limit. drop message.
-    % FIXME!!! save to the mnesia storage.
-    ?DBG("Drop message. EXCEED tht LIMIT"),
+put(Message, #mxq{name = I, queue = Q, length = L, length_limit = LM, alarm = F} = MXQ) when L > LM ->
+    % exceed the limit. save to the mnesia storage
+    ?DBG("Exceed the queue length limit. Save message to the mnesia storage"),
+    Defer = #mx_table_defer{
+        from        = "from",
+        to          = "to",
+        priority    = case I =:= 1 of
+                        true -> I;
+                        false -> I - 1 % priority up
+                      end,
+        message     = Message
+    },
+    mnesia:transaction(fun() -> mnesia:write(Defer) end),
     MXQ#mxq{alarm   = F(mxq_alarm_queue_length_limit, Q)};
 
 put(Message, #mxq{queue = Q, length = L, threshold_high = LH, alarm = F} = MXQ) when L > LH ->
@@ -75,29 +87,32 @@ put(Message, #mxq{queue = Q, length = L} = MXQ) ->
 get(#mxq{length = L} = MXQ) when L == 0 ->
     {empty, MXQ};
 
-get(#mxq{queue = Q, length = L, alarm = F} = MXQ) ->
+get(#mxq{queue = Q, length = L, alarm = F, total = T} = MXQ) ->
     {Message, Q1} = queue:out(Q),
     {Message, MXQ#mxq{
         queue   = Q1,
         length  = L - 1,
-        alarm   = F(mxq_alarm_clear, Q)
+        alarm   = F(mxq_alarm_clear, Q),
+        total   = T + 1
         }}.
 
 pop(#mxq{length = L} = MXQ) when L == 0 ->
     {empty, MXQ};
 
-pop(#mxq{queue = Q, length = L, alarm = F} = MXQ) ->
+pop(#mxq{queue = Q, length = L, alarm = F, total = T} = MXQ) ->
     {Message, Q1} = queue:out_r(Q),
     {Message, MXQ#mxq{
         queue   = Q1,
         length  = L - 1,
+        total   = T + 1,
         alarm   = F(mxq_alarm_clear, Q)
         }}.
 
-is_empty(#mxq{length = 0}) -> true;
-is_empty(#mxq{length = _}) -> false.
+is_empty(#mxq{length = 0})  -> true;
+is_empty(#mxq{length = _})  -> false.
 
-len(#mxq{length = L})  -> L.
+len(#mxq{length = L})       -> L.
+total(#mxq{total = T})      -> T.
 
 alarm() ->
     alarm(alarm_clear).
