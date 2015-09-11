@@ -197,7 +197,10 @@ send(<<$@, _/binary>> = PoolKeyTo, Message) ->
             unknown_pool;
         [PoolTo|_] ->
             cast({send, PoolTo, Message})
-    end.
+    end;
+
+send(To, Message) ->
+    unknown_receiver.
 
 
 control(ControlKey, Cmd) ->
@@ -246,8 +249,6 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-
-
 handle_call(Request, _From, State) ->
     ?ERR("unhandled call: ~p", [Request]),
     {reply, ok, State}.
@@ -262,7 +263,6 @@ handle_call(Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-
 handle_cast(Msg, State) ->
     ?ERR("unhandled cast: ~p", [Msg]),
     {noreply, State}.

@@ -85,6 +85,7 @@ init([I, Opts]) ->
                 config = [],
                 queues = QueuesTable
                },
+    erlang:send_after(0, self(), {'$gen_cast', dispatch}),
     {ok, State}.
 
 %%--------------------------------------------------------------------
@@ -203,29 +204,40 @@ handle_call(Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
--record(mxq,{queue              = queue:new(),
-             name,
-             length             = 0 :: non_neg_integer(), %% current len
-             length_limit       = ?MXQUEUE_LENGTH_LIMIT,
-             threshold_low      = ?MXQUEUE_LOW_THRESHOLD,
-             threshold_high     = ?MXQUEUE_HIGH_THRESHOLD,
-             alarm}).
-
 handle_cast({send, To, Message}, State) when is_record(To, mx_table_client) ->
     ?DBG("Send to client: ~p", [To]),
     #state{queues = QueuesTable} = State,
+    #mx_table_client{key = Key} = To,
+    % peering message priority is 1 (soft realtime)
     [{1,Q}|_] = ets:lookup(QueuesTable, 1),
-    Q1 = mx_queue:put({To#mx_table_client.key, Message}, Q),
+    Q1 = mx_queue:put({Key, Message}, Q),
     ets:insert(QueuesTable, {1, Q1}),
     {noreply, State};
 
-% handle_cast({send, To, Message}, State) when is_record(To, mx_table_channel) ->
-%     ?LOG("Send to channel: ~p", [To]),
-%     {noreply, State};
+handle_cast({send, To, Message}, State) when is_record(To, mx_table_channel) ->
+    ?DBG("Send to channel: ~p", [To]),
+    #state{queues = QueuesTable}    = State,
+    #mx_table_channel{key = Key, priority = P} = To,
+    ?DBG("Send to channel priority: ~p", [P]),
+    [{P,Q}|_] = ets:lookup(QueuesTable, P),
+    Q1 = mx_queue:put({Key, Message}, Q),
+    ets:insert(QueuesTable, {P, Q1}),
+    {noreply, State};
 
-% handle_cast({send, To, Message}, State) when is_record(To, mx_table_pool) ->
-%     ?LOG("Send to pool: ~p", [To]),
-%     {noreply, State};
+handle_cast({send, To, Message}, State) when is_record(To, mx_table_pool) ->
+    ?DBG("Send to pool: ~p", [To]),
+    #state{queues = QueuesTable}    = State,
+    #mx_table_pool{key = Key, priority = P} = To,
+    [{P,Q}|_] = ets:lookup(QueuesTable, P),
+    Q1 = mx_queue:put({Key, Message}, Q),
+    ets:insert(QueuesTable, {P, Q1}),
+    {noreply, State};
+
+handle_cast(dispatch, State) ->
+    #state{queues = QueuesTable}    = State,
+    Timeout = dispatch(QueuesTable),
+    erlang:send_after(Timeout, self(), {'$gen_cast', dispatch}),
+    {noreply, State};
 
 handle_cast(Msg, State) ->
     ?ERR("unhandled cast: ~p", [Msg]),
@@ -345,3 +357,42 @@ abandon(<<$#,_/binary>> = ChannelKey, Client) when is_record(Client, mx_table_cl
                     ok
             end
     end.
+
+dispatch(Q, 0, HasMessages) ->
+    {Q, HasMessages};
+dispatch(Q, N, HasMessages) ->
+    case mx_queue:get(Q) of
+        {empty, Q1} ->
+            {Q1, HasMessages};
+        {Message, Q1} ->
+            ?DBG("Dispatch: ~p", [Message]),
+            dispatch(Q1, N - 1, true)
+    end.
+
+% queue name = 1  (priority 1)  - process 10 messages from queue
+%              ...
+%              10 (priority 10) - process 1 message
+dispatch(QueuesTable) ->
+    case    lists:foldl(fun(P, HasMessagesAcc) ->
+                [{P,Q}|_] = ets:lookup(QueuesTable, P),
+                ?DBG("~n~nDispatch priority: ~p", [P]),
+                case dispatch(Q, 11 - P, false) of
+                    {Q1, true} ->
+                        ets:insert(QueuesTable, {P, Q1}),
+                        true;
+                    {Q1, false} ->
+                        HasMessagesAcc
+                end
+            end, false, lists:seq(1, 10)) of
+        true ->
+            ?DBG("Queue have messages... cast 'dispatch' immediately"),
+            0; % cast 'dispatch' immediately
+        false ->
+            ?DBG("Wait for new message..."),
+            5000 % wait 50 ms before 'dispatch casting'
+    end.
+
+
+
+
+

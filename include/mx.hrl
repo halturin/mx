@@ -27,9 +27,9 @@
 -define(MXQUEUE_HIGH_THRESHOLD,     0.8).
 -define(MXQUEUE_LENGTH_LIMIT,       20000).
 
--define(MXQUEUE_PRIO_NORMAL,        0).
--define(MXQUEUE_PRIO_HIGH,          5).
--define(MXQUEUE_PRIO_RT,            50).
+-define(MXQUEUE_PRIO_SRT,           1). % soft realtime
+-define(MXQUEUE_PRIO_NORMAL,        5).
+-define(MXQUEUE_PRIO_LOW,           10).
 
 -define(MXMNESIA_TABLES,
     [{mx_table_client, [{type, set},
@@ -62,7 +62,7 @@
     owners      :: list(),              % owners (who can publish here)
     subscribers :: list(),              % list of subscribed clients
     handler     :: pid(),               % who manage the last mile to the client (WebSocket, email, sms etc.)
-    priority    :: non_neg_integer(),   % priority
+    priority    = 5 :: non_neg_integer(),   % priority
     defer       :: boolean()            % deferrable
     }).
 
@@ -72,6 +72,7 @@
     owners      :: list(),
     poll        :: list(),              % list of recievers Client|Channels (key)
     balance     :: rr | hash | random,  % balance type
+    priority    = 5 :: non_neg_integer(),
     defer       :: boolean()            % deferrable
     }).
 

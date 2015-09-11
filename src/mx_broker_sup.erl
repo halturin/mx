@@ -44,7 +44,7 @@ start_link() ->
 init([]) ->
     % {ok, Opts}      = application:get_env(mx, broker),
     Opts            = [],
-    Workers         = erlang:system_info(schedulers),
+    Workers         = 1, %erlang:system_info(schedulers),
     gproc_pool:new(mx_pubsub, round_robin, [{size, Workers}]),
 
     Children = lists:map(
