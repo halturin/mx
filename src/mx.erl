@@ -233,6 +233,7 @@ start_link() ->
 init([]) ->
     process_flag(trap_exit, true),
     ok = wait_for_mnesia(5000), % wait for mnesia 5 sec
+    erlang:send_after(0, self(), {'$gen_cast', requeue}),
     {ok, #state{config = []}}.
 
 %%--------------------------------------------------------------------
@@ -269,10 +270,17 @@ handle_call({unregister_channel, ChannelKey}, _From, State) ->
     R = channel(unregister_channel, ChannelKey),
     {reply, R, State};
 
+handle_call(nodes, _From, State) ->
+    R = mx_mnesia:nodes(),
+    {reply, R, State};
+
+handle_call({send, To, Message}, _From, State) ->
+    R = send(To, Message),
+    {reply, R, State};
+
 handle_call(Request, _From, State) ->
     ?ERR("unhandled call: ~p", [Request]),
     {reply, unknown_request, State}.
-
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -283,8 +291,13 @@ handle_call(Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(Msg, State) ->
-    ?ERR("unhandled cast: ~p", [Msg]),
+handle_cast(requeue, State) ->
+    Timeout = requeue(),
+    erlang:send_after(Timeout, self(), {'$gen_cast', requeue}),
+    {noreply, State};
+
+handle_cast(Message, State) ->
+    ?ERR("unhandled cast: ~p", [Message]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -358,3 +371,12 @@ cast(M) ->
         Pid ->
             gen_server:cast(Pid, M)
     end.
+
+requeue() ->
+    % ?DBG("requeue on ~p", [node()]),
+    % модель такая же как и выборка из очереди. выгребаем 10 штук 1го приоритета... 1 шт 10го.
+    % если еще есть данные, то возвращаем 0 для таймера cast.
+    % еще надо учесть загруженность очередей, ежели они в перегрузке (>high_threshold) то пропускать.
+    % lists:map(fun(M) ->
+    % mnesia:wread({mx_table_defer, })
+    1000.
