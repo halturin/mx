@@ -211,10 +211,10 @@ handle_call(Request, _From, State) ->
              threshold_high     = ?MXQUEUE_HIGH_THRESHOLD,
              alarm}).
 
-handle_cast({send, To, Message}, #state{queues = QueuesTable} = State) when is_record(To, mx_table_client) ->
-    ?LOG("Send to client: ~p", [To]),
+handle_cast({send, To, Message}, State) when is_record(To, mx_table_client) ->
+    ?DBG("Send to client: ~p", [To]),
+    #state{queues = QueuesTable} = State,
     [{1,Q}|_] = ets:lookup(QueuesTable, 1),
-    ?LOG("Send to QQQQQQ: ~p", [Q]),
     Q1 = mx_queue:put({To#mx_table_client.key, Message}, Q),
     ets:insert(QueuesTable, {1, Q1}),
     {noreply, State};

@@ -13,6 +13,9 @@ all: compile
 compile:
 	@$(REBAR) compile
 
+debug:
+	@$(REBAR) compile -Ddebug
+
 test: compile
 	@$(REBAR) eunit skip_deps=true
 
@@ -34,13 +37,13 @@ build-plt: .dialyzer_plt
 dialyze: build-plt
 	@$(DIALYZER) --src src --plt .dialyzer_plt $(DIALYZER_WARNINGS)
 
-run: compile
+run: debug
 	@echo "[ Run (debug mode)... ]"
 	@$(ERL) -name mxnode01@127.0.0.1\
                 -pa ebin deps/*/ebin  ../deps/*/ebin ../*/ebin\
                 -s mx_helper\
                 -setcookie devcook -Ddebug=true
-run2: compile
+run2: debug
 	@echo "[ Run (debug mode)... ]"
 	@$(ERL) -name mxnode02@127.0.0.1\
                 -pa ebin deps/*/ebin  ../deps/*/ebin ../*/ebin\

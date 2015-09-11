@@ -30,9 +30,9 @@
 -record(mxq,{queue              = queue:new(),
              name,
              length             = 0 :: non_neg_integer(), %% current len
-             length_limit       = ?MXQUEUE_LENGTH_LIMIT,
-             threshold_low      = ?MXQUEUE_LOW_THRESHOLD,
-             threshold_high     = ?MXQUEUE_HIGH_THRESHOLD,
+             length_limit       = 10, %?MXQUEUE_LENGTH_LIMIT,
+             threshold_low      = 6,  %?MXQUEUE_LOW_THRESHOLD,
+             threshold_high     = 8, %?MXQUEUE_HIGH_THRESHOLD,
              alarm}).
 
 -type mxq() :: #mxq{}.
