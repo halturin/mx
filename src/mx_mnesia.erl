@@ -127,7 +127,7 @@ handle_cast(master, State) ->
             ?ERR("failed to create Mnesia schema: ~p", [E])
     end,
     ok = mnesia:start(),
-    [create_table(T,A) || {T,A} <- ?MXMNESIA_TABLES],
+    [create_table(T,A) || {T,A} <- ?MXTABLES],
     mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
     {noreply, State#state{status = running}};
 
@@ -145,7 +145,7 @@ handle_cast({master, Master}, State) ->
             ?DBG("Mnesia cluster: ~p", [Cluster]),
             ok
     end,
-    [copy_table(T) || T <- ?MXMNESIA_TABLES],
+    [copy_table(T) || T <- ?MXTABLES],
     mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
 
 

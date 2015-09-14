@@ -30,9 +30,9 @@
 -record(mxq,{queue              = queue:new(),
              name               :: non_neg_integer(),
              length             = 0 :: non_neg_integer(), %% current len
-             length_limit       = 10, %?MXQUEUE_LENGTH_LIMIT,
-             threshold_low      = 6,  %?MXQUEUE_LOW_THRESHOLD,
-             threshold_high     = 8, %?MXQUEUE_HIGH_THRESHOLD,
+             length_limit       = ?MXQUEUE_LENGTH_LIMIT,
+             threshold_low      = ?MXQUEUE_LOW_THRESHOLD,
+             threshold_high     = ?MXQUEUE_HIGH_THRESHOLD,
              total              = 0, % total messages
              alarm}).
 
@@ -49,20 +49,8 @@ new(QueueName) when is_integer(QueueName) ->
 new(_) ->
     {error, "non negative integer is expected"}.
 
-put(Message, #mxq{name = I, queue = Q, length = L, length_limit = LM, alarm = F} = MXQ) when L > LM ->
-    % exceed the limit. save to the mnesia storage
-    ?DBG("Exceed the queue length limit. Save message to the mnesia storage"),
-    Defer = #mx_table_defer{
-        from        = "from",
-        to          = "to",
-        priority    = case I =:= 1 of
-                        true -> I;
-                        false -> I - 1 % priority up
-                      end,
-        message     = Message
-    },
-    mnesia:transaction(fun() -> mnesia:write(Defer) end),
-    MXQ#mxq{alarm   = F(mxq_alarm_queue_length_limit, Q)};
+put({To, Message}, #mxq{name = I, queue = Q, length = L, length_limit = LM, alarm = F} = MXQ) when L > LM ->
+    {defer, MXQ#mxq{alarm   = F(mxq_alarm_queue_length_limit, Q)}};
 
 put(Message, #mxq{queue = Q, length = L, threshold_high = LH, alarm = F} = MXQ) when L > LH ->
     MXQ#mxq{queue   = queue:in(Message, Q),
