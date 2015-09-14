@@ -387,6 +387,8 @@ requeue(P, N, HasDeferred) ->
     % case mnesia:wread({?MXDEFER, }) of
     % end,
     % send(To, Message, [{priority, P}]),
+
+    % mx_queue:len(Q)
     requeue(P, N - 1, HasDeferred).
 
 

@@ -23,9 +23,10 @@
 -define(MX_HRL, true).
 
 % queue limits
--define(MXQUEUE_LOW_THRESHOLD,      0.6).
--define(MXQUEUE_HIGH_THRESHOLD,     0.8).
--define(MXQUEUE_LENGTH_LIMIT,       20000).
+-define(MXQUEUE_LENGTH_LIMIT,       10).
+-define(MXQUEUE_LOW_THRESHOLD,      trunc(?MXQUEUE_LENGTH_LIMIT * 0.6)). % 60%
+-define(MXQUEUE_HIGH_THRESHOLD,     trunc(?MXQUEUE_LENGTH_LIMIT * 0.8)). % 80%
+
 
 -define(MXQUEUE_PRIO_SRT,           1). % soft realtime
 -define(MXQUEUE_PRIO_NORMAL,        5).

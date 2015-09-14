@@ -387,15 +387,20 @@ dispatch(Q, N, HasMessages) ->
     case mx_queue:get(Q) of
         {empty, Q1} ->
             {Q1, HasMessages};
-        {{value, {Key, {To, Message}}}, Q1} when is_record(To, ?MXCLIENT) ->
+        {{value, {_, {To, Message}}}, Q1} when is_record(To, ?MXCLIENT) ->
             ?DBG("Dispatch to the client: ~p [MESSAGE: ~p]", [To, Message]),
 
             dispatch(Q1, N - 1, true);
-        {{value, {Key, {To, Message}}}, Q1} when is_record(To, ?MXCHANNEL) ->
+        {{value, {_, {To, Message}}}, Q1} when is_record(To, ?MXCHANNEL) ->
+            #?MXCHANNEL{subscribers = Subscribers} = To,
             ?DBG("Dispatch to channel subscribers: ~p [MESSAGE: ~p]", [To, Message]),
+            % lists:foldl(fun(ClientKey) ->
+
+            % end, Subscribers),
+
             dispatch(Q1, N - 1, true);
 
-        {{value, {Key, {To, Message}}}, Q1} when is_record(To, ?MXPOOL) ->
+        {{value, {_, {To, Message}}}, Q1} when is_record(To, ?MXPOOL) ->
             ?DBG("Dispatch to the pool: ~p [MESSAGE: ~p]", [To, Message]),
             dispatch(Q1, N - 1, true)
 
