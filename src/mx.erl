@@ -107,20 +107,23 @@
 
 %%% API
 %%%===================================================================
-client(register, Client) when is_integer(Client)->
-    client(register, integer_to_binary(Client));
-
-client(register, Client) when is_list(Client)->
-    client(register, list_to_binary(Client));
-
-client(register, Client) when is_binary(Client)->
-    call({register_client, Client});
+client(register, Client) ->
+    client(register, Client, []);
 
 client(unregister, <<$*,_/binary>> = ClientKey) ->
     call({unregister_client, ClientKey});
 
 client(info, <<$*, _/binary>> = ClientKey) ->
     call({info_client, ClientKey}).
+
+client(register, Client, Opts) when is_integer(Client)->
+    client(register, integer_to_binary(Client), Opts);
+
+client(register, Client, Opts) when is_list(Client)->
+    client(register, list_to_binary(Client), Opts);
+
+client(register, Client, Opts) when is_binary(Client)->
+    call({register_client, Client, Opts});
 
 client(set, <<$*, _/binary>> = ClientKey, Opts) ->
     ok;

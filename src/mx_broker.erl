@@ -71,7 +71,7 @@ start_link(I, Opts) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([I, Opts]) ->
+init([I, _Opts]) ->
     process_flag(trap_exit, true),
     gproc_pool:connect_worker(mx_pubsub, {mx_broker, I}),
     QueuesTable = list_to_atom("mx_broker_" ++ integer_to_list(I) ++ "_queues"),
@@ -103,7 +103,7 @@ init([I, Opts]) ->
 %% @end
 %%--------------------------------------------------------------------
 
-handle_call({register_client, Client}, From, State) ->
+handle_call({register_client, Client, Opts}, From, State) ->
     ClientHash  = erlang:md5(Client),
     ClientKey   = <<$*, ClientHash/binary>>,
     C = #?MXCLIENT{
@@ -112,7 +112,8 @@ handle_call({register_client, Client}, From, State) ->
             channels = [],
             ownerof  = [],
             pools    = [],
-            handler  = From
+            handler  = From,
+            comment  = proplists:get_value(comment, Opts, "Client info")
         },
 
     Trn =   fun() ->
@@ -144,7 +145,8 @@ handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
                 subscribers = [],
                 handler     = From,
                 priority    = proplists:get_value(priority, Opts, ?MXQUEUE_PRIO_NORMAL),
-                defer       = proplists:get_value(defer, Opts, true)
+                defer       = proplists:get_value(defer, Opts, true),
+                comment     = proplists:get_value(comment, Opts, "Channel info")
             },
 
             Trn =   fun() ->
@@ -222,13 +224,13 @@ handle_cast({send, To, Message, Opts}, State) when is_record(To, ?MXCLIENT) ->
 handle_cast({send, To, Message, Opts}, State) when is_record(To, ?MXCHANNEL) ->
     ?DBG("Send to channel: ~p", [To]),
     #state{queues = QueuesTable}    = State,
-    #?MXCHANNEL{key = Key, priority = ChannelP} = To,
+    #?MXCHANNEL{key = Key, priority = ChannelP, defer = Deferrable} = To,
     P = proplists:get_value(priotiry, Opts, ChannelP),
     [{P,Q}|_] = ets:lookup(QueuesTable, P),
     case mx_queue:put({Key, {To, Message}}, Q) of
-        {defer, Q1} when P == 1 ->
+        {defer, Q1} when P =:= 1, Deferrable =:= true ->
             defer(P, Key, Message);
-        {defer, Q1} when P > 1 ->
+        {defer, Q1} when P > 1, Deferrable =:= true ->
             defer(P - 1, Key, Message);
         Q1 ->
             pass
@@ -239,13 +241,13 @@ handle_cast({send, To, Message, Opts}, State) when is_record(To, ?MXCHANNEL) ->
 handle_cast({send, To, Message, Opts}, State) when is_record(To, ?MXPOOL) ->
     ?DBG("Send to pool: ~p", [To]),
     #state{queues = QueuesTable}    = State,
-    #?MXPOOL{key = Key, priority = PoolP} = To,
+    #?MXPOOL{key = Key, priority = PoolP,  defer = Deferrable} = To,
     P = proplists:get_value(priotiry, Opts, PoolP),
     [{P,Q}|_] = ets:lookup(QueuesTable, P),
     case mx_queue:put({Key, {To, Message}}, Q) of
-        {defer, Q1} when P == 1 ->
+        {defer, Q1} when P =:= 1, Deferrable =:= true ->
             defer(P, Key, Message);
-        {defer, Q1} when P > 1 ->
+        {defer, Q1} when P > 1, Deferrable =:= true ->
             defer(P, Key, Message);
         Q1 ->
             pass
@@ -313,25 +315,24 @@ unregister_client(ClientKey) ->
         [] ->
             unknown_client;
         [Client|_] ->
-            [unsubscribe_client(Ch, Client) || Ch <- Client#?MXCLIENT.channels],
-            [leave_client(P, Client) || P <- Client#?MXCLIENT.pools],
+            [unrelate_client(Ch, Client) || Ch <- Client#?MXCLIENT.related],
             [abandon(I, Client) || I <- Client#?MXCLIENT.ownerof],
             mnesia:transaction(fun() -> mnesia:delete({?MXCLIENT, ClientKey}) end),
             ok
     end.
 
 unregister_channel(ChannelKey) ->
-    case mnesia:dirty_read(?MXCHANNEL, ChannelKey) of
+    case mnesia:dirty_read(?MXRELATIONS, ChannelKey) of
         [] ->
             unknown_channel;
-        [Channel|_] ->
-            % remove subscriptions
+        [RelationList|_] ->
+            % remove relation
             lists:map(fun(ClientKey) ->
                 mnesia:dirty_read(?MXCLIENT, ClientKey),
                 ClientChannels = lists:delete(ChannelKey, Channel#?MXCLIENT.channels),
                 UpdatedClient = Channel#?MXCLIENT{channels = ClientChannels},
                 mnesia:transaction(fun() -> mnesia:write(UpdatedClient) end)
-            end, Channel#?MXCHANNEL.subscribers),
+            end, RelationList#?MXRELATIONS.related),
             % remove owning
             lists:map(fun(ClientKey) ->
                 [Client|_] = mnesia:dirty_read(?MXCLIENT, ClientKey),
@@ -344,20 +345,17 @@ unregister_channel(ChannelKey) ->
             ok
     end.
 
-unsubscribe_client(ChannelKey, Client) when is_record(Client, ?MXCLIENT) ->
-    case mnesia:dirty_read(?MXCHANNEL, ChannelKey) of
+unrelate_client(Key, Client) when is_record(Client, ?MXCLIENT) ->
+    case mnesia:dirty_read(?MXRELATIONS, Key) of
         [] ->
             ok;
-        [Channel|_] ->
-            Subs = lists:delete(Client#?MXCLIENT.key, Channel#?MXCHANNEL.subscribers),
-            UpdatedChannel = Channel#?MXCHANNEL{subscribers = Subs},
-            mnesia:transaction(fun() -> mnesia:write(UpdatedChannel) end),
+        [RelatedList|_] ->
+            Related = lists:delete(RelatedList#?MXRELATIONS.key, RelatedList#?MXRELATIONS.related),
+            UpdatedRelation = Channel#?MXRELATIONS{related = Related},
+            mnesia:transaction(fun() -> mnesia:write(UpdatedRelation) end),
             ok
     end.
 
-leave_client(PoolKey, Client) when is_record(Client, ?MXCLIENT) ->
-    ?ERR("unimplemented leave_client function"),
-    ok.
 
 abandon(<<$@,_/binary>> = PoolKey, Client) when is_record(Client, ?MXCLIENT) ->
     ?ERR("unimplemented abandon pool function"),
