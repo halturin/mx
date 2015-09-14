@@ -94,6 +94,7 @@
          pool/2,
          pool/3,
          send/2,
+         send/3,
          control/2
         ]).
 
@@ -175,31 +176,34 @@ pool(info, PoolName) ->
     ok.
 
 
-send(<<$*, _/binary>> = ClientKeyTo, Message) ->
-    case mnesia:dirty_read(mx_table_client, ClientKeyTo) of
+send(To, Message) ->
+    send(To, Message, []).
+
+send(<<$*, _/binary>> = ClientKeyTo, Message, Opts) ->
+    case mnesia:dirty_read(?MXCLIENT, ClientKeyTo) of
         [] ->
             unknown_client;
         [ClientTo|_] ->
-            cast({send, ClientTo, Message})
+            cast({send, ClientTo, Message, Opts})
     end;
 
-send(<<$#, _/binary>> = ChannelKeyTo, Message) ->
-    case mnesia:dirty_read(mx_table_channel, ChannelKeyTo) of
+send(<<$#, _/binary>> = ChannelKeyTo, Message, Opts) ->
+    case mnesia:dirty_read(?MXCHANNEL, ChannelKeyTo) of
         [] ->
             unknown_channel;
         [ChannelTo|_] ->
-            cast({send, ChannelTo, Message})
+            cast({send, ChannelTo, Message, Opts})
     end;
 
-send(<<$@, _/binary>> = PoolKeyTo, Message) ->
-    case mnesia:dirty_read(mx_table_pool, PoolKeyTo) of
+send(<<$@, _/binary>> = PoolKeyTo, Message, Opts) ->
+    case mnesia:dirty_read(?MXPOOL, PoolKeyTo) of
         [] ->
             unknown_pool;
         [PoolTo|_] ->
-            cast({send, PoolTo, Message})
+            cast({send, PoolTo, Message, Opts})
     end;
 
-send(To, Message) ->
+send(_, _, _) ->
     unknown_receiver.
 
 
@@ -275,7 +279,11 @@ handle_call(nodes, _From, State) ->
     {reply, R, State};
 
 handle_call({send, To, Message}, _From, State) ->
-    R = send(To, Message),
+    R = send(To, Message, []),
+    {reply, R, State};
+
+handle_call({send, To, Message, Opts}, _From, State) ->
+    R = send(To, Message, Opts),
     {reply, R, State};
 
 handle_call(Request, _From, State) ->
@@ -372,11 +380,36 @@ cast(M) ->
             gen_server:cast(Pid, M)
     end.
 
+requeue(P, 0, HasDeferred) ->
+    HasDeferred;
+
+requeue(P, N, HasDeferred) ->
+    % case mnesia:wread({?MXDEFER, }) of
+    % end,
+    % send(To, Message, [{priority, P}]),
+    requeue(P, N - 1, HasDeferred).
+
+
 requeue() ->
-    % ?DBG("requeue on ~p", [node()]),
+        case    lists:foldl(fun(P, HasDeferredAcc) ->
+                    case requeue(P, 11 - P, false) of
+                        true  ->
+                            true;
+                        false ->
+                            HasDeferredAcc
+                    end
+                end, false, lists:seq(1, 10)) of
+        true ->
+            ?DBG("Queue have messages... cast 'dispatch' immediately"),
+            0; % cast 'dispatch' immediately
+        false ->
+            ?DBG("Wait for deferred message..."),
+            5000 % FIXME later. wait 50 ms before 'dispatch requeue'
+    end.
+
+
     % модель такая же как и выборка из очереди. выгребаем 10 штук 1го приоритета... 1 шт 10го.
     % если еще есть данные, то возвращаем 0 для таймера cast.
     % еще надо учесть загруженность очередей, ежели они в перегрузке (>high_threshold) то пропускать.
     % lists:map(fun(M) ->
-    % mnesia:wread({mx_table_defer, })
-    1000.
+    % mnesia:wread({?MXDEFER, })

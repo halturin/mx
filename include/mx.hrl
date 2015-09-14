@@ -31,23 +31,33 @@
 -define(MXQUEUE_PRIO_NORMAL,        5).
 -define(MXQUEUE_PRIO_LOW,           10).
 
--define(MXMNESIA_TABLES,
-    [{mx_table_client, [{type, set},
-                        {disc_copies, [node()]},
-                        {record_name, mx_table_client},
-                        {attributes, record_info(fields, mx_table_client)} ]},
+-define(MXCLIENT,                   mx_table_client).
+-define(MXCHANNEL,                  mx_table_channel).
+-define(MXPOOL,                     mx_table_pool).
+-define(MXDEFER,                    mx_table_defer).
 
-    {mx_table_channel,[{type, set},
+-define(MXTABLES,
+    [{?MXCLIENT, [{type, set},
                         {disc_copies, [node()]},
-                        {record_name, mx_table_channel},
-                        {attributes, record_info(fields, mx_table_channel)} ]},
+                        {record_name, ?MXCLIENT},
+                        {attributes, record_info(fields, ?MXCLIENT)} ]},
 
-    {mx_table_defer, [{type, bag},
+    {?MXCHANNEL,[{type, set},
                         {disc_copies, [node()]},
-                        {record_name, mx_table_defer},
-                        {attributes, record_info(fields, mx_table_defer)} ]} ]).
+                        {record_name, ?MXCHANNEL},
+                        {attributes, record_info(fields, ?MXCHANNEL)} ]},
 
--record(mx_table_client, {
+    {?MXPOOL,[{type, set},
+                        {disc_copies, [node()]},
+                        {record_name, ?MXPOOL},
+                        {attributes, record_info(fields, ?MXPOOL)} ]},
+
+    {?MXDEFER, [{type, bag},
+                        {disc_copies, [node()]},
+                        {record_name, ?MXDEFER},
+                        {attributes, record_info(fields, ?MXDEFER)} ]} ]).
+
+-record(?MXCLIENT, {
     key         :: binary(),
     name        :: binary(),
     channels    :: list(),              % subscribed to
@@ -56,7 +66,7 @@
     handler     :: pid() | offline      % who manage the client (for recieving messages)
     }).
 
--record(mx_table_channel, {
+-record(?MXCHANNEL, {
     key         :: binary(),
     name        :: binary(),
     owners      :: list(),              % owners (who can publish here)
@@ -66,22 +76,21 @@
     defer       :: boolean()            % deferrable
     }).
 
--record(mx_table_pool, {
+-record(?MXPOOL, {
     key         :: binary(),
     name        :: binary(),
     owners      :: list(),
-    poll        :: list(),              % list of recievers Client|Channels (key)
-    balance     :: rr | hash | random,  % balance type
+    poll        :: list(),                  % list of recievers Client|Channels (key)
+    balance     :: rr | hash | random,      % balance type
     priority    = 5 :: non_neg_integer(),
-    defer       :: boolean()            % deferrable
+    defer       :: boolean()                % deferrable
     }).
 
--record(mx_table_defer, {
-    from        :: binary(),            % message from (key)
-    to          :: binary(),            % message for client|channel|pool (key)
-    fails       = 0 :: non_neg_integer(),   % count of sending fails
+-record(?MXDEFER, {
+    to          :: binary(),
+    message,
     priority    :: non_neg_integer(),
-    message
+    fails       = 0 :: non_neg_integer()    % count of sending fails
     }).
 
 -endif. % MX_HRL
