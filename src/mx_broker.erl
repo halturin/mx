@@ -344,7 +344,10 @@ unregister(<<$@, _/binary>> = Key) -> % channel
             remove_relations(R#?MXPOOL.related),
             remove_owning(R#?MXPOOL.owners),
             mnesia:transaction(fun() -> mnesia:delete({?MXPOOL, Key}) end)
-    end.
+    end;
+
+unregister(Key) ->
+    unknown_key.
 
 unrelate(<<X:8/binary, _/binary>> = RelatedToKey, Key) when X =:= <<$@>>;
                                                             X =:= <<$#>> ->
