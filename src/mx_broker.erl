@@ -197,7 +197,7 @@ handle_call({join, Client, Pool}, _From, State) ->
 handle_call({leave, Client, Pool}, _From, State) ->
     {reply, ok, State};
 
-handle_call({unregister, Key}, From, State) ->
+handle_call({unregister, Key}, _From, State) ->
     R = unregister(Key),
     {reply, R, State};
 
@@ -220,8 +220,9 @@ handle_cast({send, To, Message, Opts}, State) when is_record(To, ?MXCLIENT) ->
     ?DBG("Send to client: ~p", [To]),
     #state{queues = QueuesTable} = State,
     #?MXCLIENT{key = Key} = To,
-    % peering message priority is 1 (soft realtime)
-    [{1,Q}|_] = ets:lookup(QueuesTable, 1),
+    % peering message priority is 1, but can be overrided via options
+    P = proplists:get_value(priority, Opts, 1),
+    [{P,Q}|_] = ets:lookup(QueuesTable, P),
     case mx_queue:put({Key, {To, Message}}, Q) of
         {defer, Q1} ->
             defer(1, Key, Message);
@@ -235,7 +236,7 @@ handle_cast({send, To, Message, Opts}, State) when is_record(To, ?MXCHANNEL) ->
     ?DBG("Send to channel: ~p", [To]),
     #state{queues = QueuesTable}    = State,
     #?MXCHANNEL{key = Key, priority = ChannelP, defer = Deferrable} = To,
-    P = proplists:get_value(priotiry, Opts, ChannelP),
+    P = proplists:get_value(priority, Opts, ChannelP),
     [{P,Q}|_] = ets:lookup(QueuesTable, P),
     case mx_queue:put({Key, {To, Message}}, Q) of
         {defer, Q1} when P =:= 1, Deferrable =:= true ->
@@ -252,7 +253,7 @@ handle_cast({send, To, Message, Opts}, State) when is_record(To, ?MXPOOL) ->
     ?DBG("Send to pool: ~p", [To]),
     #state{queues = QueuesTable}    = State,
     #?MXPOOL{key = Key, priority = PoolP,  defer = Deferrable} = To,
-    P = proplists:get_value(priotiry, Opts, PoolP),
+    P = proplists:get_value(priority, Opts, PoolP),
     [{P,Q}|_] = ets:lookup(QueuesTable, P),
     case mx_queue:put({Key, {To, Message}}, Q) of
         {defer, Q1} when P =:= 1, Deferrable =:= true ->
@@ -351,7 +352,7 @@ unregister(<<$@, _/binary>> = Key) -> % channel
             mnesia:transaction(fun() -> mnesia:delete({?MXPOOL, Key}) end)
     end;
 
-unregister(Key) ->
+unregister(_Key) ->
     unknown_key.
 
 unrelate(<<X:8/binary, _/binary>> = RelatedToKey, Key) when X =:= <<$@>>;
@@ -465,7 +466,7 @@ dispatch(QueuesTable) ->
                     {Q1, true} ->
                         ets:insert(QueuesTable, {P, Q1}),
                         true;
-                    {Q1, false} ->
+                    {_, false} ->
                         HasMessagesAcc
                 end
             end, false, lists:seq(1, 10)) of

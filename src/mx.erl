@@ -86,7 +86,7 @@ client(register, Client) ->
     client(register, {Client, []});
 
 client(set, {<<$*, _/binary>> = ClientKey, Opts}) ->
-    ok;
+    {fixme, ClientKey, Opts};
 
 client(unregister, <<$*,_/binary>> = ClientKey) ->
     call({unregister, ClientKey});
@@ -104,7 +104,7 @@ channel(register, ChannelName, <<$*, _/binary>> = ClientKey) ->
     call({register_channel, {ChannelName,[]}, ClientKey});
 
 channel(set, ChannelKey, Opts) ->
-    ok.
+    {fixme, ChannelKey, Opts}.
 
 channel(unregister, <<$#,_/binary>> = ChannelKey) ->
     call({unregister, ChannelKey});
@@ -123,7 +123,7 @@ pool(register, PoolName, <<$*, _/binary>> = ClientKey) when is_binary(PoolName) 
 
 
 pool(set, PoolKey, Opts) ->
-    ok.
+    {fixme, PoolKey, Opts}.
 
 pool(unregister, <<$@,_/binary>> = PoolKey) ->
     call({unregister, PoolKey});
@@ -277,6 +277,21 @@ handle_call({unregister, Key}, _From, State) ->
     R = call({unregister, Key}),
     {reply, R, State};
 
+handle_call({subscribe, Client, To}, _From, State) ->
+    R = subscribe(Client, To),
+    {reply, R, State};
+
+handle_call({unsubscribe, Client, From}, _From, State) ->
+    R = unsubscribe(Client, From),
+    {reply, R, State};
+
+handle_call({join, Client, To}, _From, State) ->
+    R = join(Client, To),
+    {reply, R, State};
+
+handle_call({leave, Client, From}, _From, State) ->
+    R = leave(Client, From),
+    {reply, R, State};
 
 handle_call(nodes, _From, State) ->
     R = mx_mnesia:nodes(),
@@ -384,9 +399,8 @@ cast(M) ->
             gen_server:cast(Pid, M)
     end.
 
-requeue(P, 0, HasDeferred) ->
+requeue(_, 0, HasDeferred) ->
     HasDeferred;
-
 requeue(P, N, HasDeferred) ->
     % case mnesia:wread({?MXDEFER, }) of
     % end,
@@ -433,7 +447,7 @@ action(Action, <<$#, _/binary>> = ChannelKey, Channel) ->
         [] ->
             unknown_channel_client;
         [ChannelClient|_] ->
-            call({subscribe, ChannelClient, Channel})
+            call({Action, ChannelClient, Channel})
     end;
 
 action(Action, <<$@, _/binary>> = PoolKey, Channel) ->
@@ -441,5 +455,5 @@ action(Action, <<$@, _/binary>> = PoolKey, Channel) ->
         [] ->
             unknown_pool;
         [Pool|_] ->
-            call({subscribe, Pool, Channel})
+            call({Action, Pool, Channel})
     end.

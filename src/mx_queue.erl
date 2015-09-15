@@ -21,7 +21,7 @@
 
 -module(mx_queue).
 
--export([new/1, put/2, get/1, pop/1, is_empty/1, len/1]).
+-export([new/1, put/2, get/1, pop/1, is_empty/1, len/1, total/1]).
 
 %% includes
 -include_lib("include/log.hrl").
@@ -49,7 +49,7 @@ new(QueueName) when is_integer(QueueName) ->
 new(_) ->
     {error, "non negative integer is expected"}.
 
-put({To, Message}, #mxq{name = I, queue = Q, length = L, length_limit = LM, alarm = F} = MXQ) when L > LM ->
+put(_, #mxq{queue = Q, length = L, length_limit = LM, alarm = F} = MXQ) when L > LM ->
     {defer, MXQ#mxq{alarm   = F(mxq_alarm_queue_length_limit, Q)}};
 
 put(Message, #mxq{queue = Q, length = L, threshold_high = LH, alarm = F} = MXQ) when L > LH ->
@@ -105,8 +105,9 @@ total(#mxq{total = T})      -> T.
 alarm() ->
     alarm(alarm_clear).
 alarm(State) ->
-    fun(Alarm, Q) when Alarm =:= State -> alarm(State);
+    fun(Alarm, _) when Alarm =:= State -> alarm(State);
        (Alarm, Q) when Alarm =/= State ->
-            ?LOG("Warinig: ~p -> ~p", [State,Alarm]), alarm(Alarm)
+            ?LOG("Warinig: ~p -> ~p (Q:~p)", [State, Alarm, Q]),
+            alarm(Alarm)
     end.
 
