@@ -89,7 +89,7 @@
     name        :: binary(),
     related     :: list(),              % in case of tree-like pooling (example: channel of pools)
     owners      :: list(),
-    balance     :: rr | hash | random,      % balance type
+    balance     = rr :: rr | hash | random,      % balance type
     async       = true :: boolean(),        % send async
     priority    = 5 :: non_neg_integer(),
     defer       = true :: boolean(),        % deferrable

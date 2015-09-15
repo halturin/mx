@@ -168,18 +168,6 @@ handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
             end
     end;
 
-handle_call({unregister, ChannelKey}, From, State) ->
-    R = unregister(ChannelKey),
-    {reply, R, State};
-
-
-handle_call({subscribe, ClientKey, ChanneName}, _From, State) ->
-    {reply, ok, State};
-
-handle_call({unsubscribe, ClientKey, ChanneName}, _From, State) ->
-    {reply, ok, State};
-
-
 handle_call({info_client, ClientKey}, _From, State) ->
     ?LOG("Broker:~p", [State#state.id]),
     case mnesia:dirty_read(?MXCLIENT, ClientKey) of
@@ -196,6 +184,23 @@ handle_call({info_channel, ChannelKey}, _From, State) ->
         [Channel|_] ->
             {reply, Channel, State}
     end;
+
+handle_call({subscribe, Client, Channel}, _From, State) ->
+    {reply, ok, State};
+
+handle_call({unsubscribe, Client, Channel}, _From, State) ->
+    {reply, ok, State};
+
+handle_call({join, Client, Pool}, _From, State) ->
+    {reply, ok, State};
+
+handle_call({leave, Client, Pool}, _From, State) ->
+    {reply, ok, State};
+
+handle_call({unregister, Key}, From, State) ->
+    R = unregister(Key),
+    {reply, R, State};
+
 
 handle_call(Request, _From, State) ->
     ?ERR("unhandled call: ~p", [Request]),

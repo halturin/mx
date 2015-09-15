@@ -61,7 +61,6 @@
          code_change/3]).
 
 -export([client/2,
-         client/3,
          channel/2,
          channel/3,
          pool/2,
@@ -79,8 +78,15 @@
 
 %%% API
 %%%===================================================================
+client(register, {Client, Opts}) when is_list(Client)->
+    client(register, {list_to_binary(Client), Opts});
+client(register, {Client, Opts}) when is_binary(Client)->
+    call({register_client, Client, Opts});
 client(register, Client) ->
-    client(register, Client, []);
+    client(register, {Client, []});
+
+client(set, {<<$*, _/binary>> = ClientKey, Opts}) ->
+    ok;
 
 client(unregister, <<$*,_/binary>> = ClientKey) ->
     call({unregister, ClientKey});
@@ -88,47 +94,14 @@ client(unregister, <<$*,_/binary>> = ClientKey) ->
 client(info, <<$*, _/binary>> = ClientKey) ->
     call({info_client, ClientKey}).
 
-client(register, Client, Opts) when is_integer(Client)->
-    client(register, integer_to_binary(Client), Opts);
-
-client(register, Client, Opts) when is_list(Client)->
-    client(register, list_to_binary(Client), Opts);
-
-client(register, Client, Opts) when is_binary(Client)->
-    call({register_client, Client, Opts});
-
-client(set, <<$*, _/binary>> = ClientKey, Opts) ->
-    ok;
-
-% for channels
-client(subscribe, <<$*, _/binary>> = ClientKey, ChannelName) when is_list(ChannelName) ->
-    client(subscribe, ClientKey, list_to_binary(ChannelName));
-client(subscribe, <<$*, _/binary>> = ClientKey, ChannelName) when is_binary(ChannelName) ->
-    call({subscribe, ClientKey, ChannelName});
-
-client(unsubscribe, <<$*, _/binary>> = ClientKey,
-                    <<$#, _/binary>> = ChannelKey) ->
-    call({unsubscribe, ClientKey, ChannelKey});
-
-% for pools
-client(join, <<$*, _/binary>> = ClientKey, PoolName) when is_list(PoolName) ->
-    client(join, ClientKey, list_to_binary(PoolName));
-client(join, <<$*, _/binary>> = ClientKey, PoolName) when is_binary(PoolName) ->
-    call({join, ClientKey, PoolName});
-
-client(leave, <<$*, _/binary>> = ClientKey,
-              <<$@, _/binary>> = PoolKey) ->
-    call({leave, ClientKey, PoolKey}).
 
 
 channel(register, {ChannelName, Opts}, <<$*, _/binary>> = ClientKey) when is_list(ChannelName) ->
     channel(register, {list_to_binary(ChannelName), Opts}, ClientKey);
-channel(register, ChannelName, <<$*, _/binary>> = ClientKey) when is_list(ChannelName) ->
-    channel(register, {list_to_binary(ChannelName),[]}, ClientKey);
 channel(register, {ChannelName, Opts}, <<$*, _/binary>> = ClientKey) when is_binary(ChannelName) ->
     call({register_channel, {ChannelName, Opts}, ClientKey});
-channel(register, ChannelName, <<$*, _/binary>> = ClientKey) when is_binary(ChannelName) ->
-    call({register_channel, ChannelName, ClientKey});
+channel(register, ChannelName, <<$*, _/binary>> = ClientKey) ->
+    call({register_channel, {ChannelName,[]}, ClientKey});
 
 channel(set, ChannelKey, Opts) ->
     ok.
@@ -139,9 +112,15 @@ channel(unregister, <<$#,_/binary>> = ChannelKey) ->
 channel(info, <<$#,_/binary>> = ChannelKey) ->
     call({info_channel, ChannelKey}).
 
+pool(register, {PoolName, Opts}, <<$*, _/binary>> = ClientKey) when is_list(PoolName) ->
+    pool(register, {list_to_binary(PoolName), Opts}, ClientKey);
+pool(register, PoolName, <<$*, _/binary>> = ClientKey) when is_list(PoolName) ->
+    pool(register, {list_to_binary(PoolName), []}, ClientKey);
+pool(register, {PoolName, Opts}, <<$*, _/binary>> = ClientKey) when is_binary(PoolName) ->
+    call({register_pool, {PoolName, Opts}, ClientKey});
+pool(register, PoolName, <<$*, _/binary>> = ClientKey) when is_binary(PoolName) ->
+    call({register_pool, {PoolName,[]}, ClientKey});
 
-pool(register, PoolName, Client) ->
-    ok;
 
 pool(set, PoolKey, Opts) ->
     ok.
@@ -152,6 +131,52 @@ pool(unregister, <<$@,_/binary>> = PoolKey) ->
 pool(info, <<$@, _/binary>> = PoolKey) ->
     call({info_pool, PoolKey}).
 
+subscribe(Key, To) when is_list(To) ->
+    ToHash = erlang:md5(list_to_binary(To)),
+    subscribe(Key, <<$#, ToHash/binary>>);
+
+subscribe(Key, <<$#, _/binary>> = To) ->
+    case mnesia:dirty_read(?MXCHANNEL, To) of
+        [] ->
+            unknown_channel;
+        [Channel|_] ->
+            action(subscribe, Key, Channel)
+    end.
+
+unsubscribe(Key, From) when is_list(From) ->
+    FromHash = erlang:md5(list_to_binary(From)),
+    subscribe(Key, <<$#, FromHash/binary>>);
+
+unsubscribe(Key, <<$#, _/binary>> = From) ->
+    case mnesia:dirty_read(?MXCHANNEL, From) of
+        [] ->
+            unknown_channel;
+        [Channel|_] ->
+            action(unsubscribe, Key, Channel)
+    end.
+
+join(Key, To) when is_list(To) ->
+    ToHash = erlang:md5(list_to_binary(To)),
+    join(Key, <<$@, ToHash/binary>>);
+
+join(Key, <<$@, _/binary>> = To) ->
+    case mnesia:dirty_read(?MXPOOL, To) of
+        [] ->
+            unknown_pool;
+        [Pool|_] ->
+            action(join, Key, Pool)
+    end.
+
+leave(Key, From) when is_list(From) ->
+    FromHash = erlang:md5(list_to_binary(From)),
+    leave(Key, <<$@, FromHash/binary>>);
+leave(Key, <<$@, _/binary>> = From) ->
+    case mnesia:dirty_read(?MXPOOL, From) of
+        [] ->
+            unknown_pool;
+        [Pool|_] ->
+            action(leave, Key, Pool)
+    end.
 
 send(To, Message) ->
     send(To, Message, []).
@@ -227,25 +252,25 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_call({register_client, {Client, Opts}}, _From, State) ->
+    R = client(register, {Client, Opts}),
+    {reply, R, State};
 handle_call({register_client, Client}, _From, State) ->
     R = client(register, Client),
-    {reply, R, State};
-handle_call({register_client, {Client, Opts}}, _From, State) ->
-    R = client(register, Client, Opts),
     {reply, R, State};
 
 handle_call({register_channel, {ChannelName, Opts}, ClientKey}, _From, State) ->
     R = channel(register, {ChannelName, Opts}, ClientKey),
     {reply, R, State};
 handle_call({register_channel, ChannelName, ClientKey}, _From, State) ->
-    R = channel(register, {ChannelName, []}, ClientKey),
+    R = channel(register, ChannelName, ClientKey),
     {reply, R, State};
 
 handle_call({register_pool, {PoolName, Opts}, ClientKey}, _From, State) ->
     R = pool(register, {PoolName, Opts}, ClientKey),
     {reply, R, State};
 handle_call({register_pool, PoolName, ClientKey}, _From, State) ->
-    R = pool(register, {PoolName, []}, ClientKey),
+    R = pool(register, PoolName, ClientKey),
     {reply, R, State};
 
 handle_call({unregister, Key}, _From, State) ->
@@ -394,3 +419,27 @@ requeue() ->
     % еще надо учесть загруженность очередей, ежели они в перегрузке (>high_threshold) то пропускать.
     % lists:map(fun(M) ->
     % mnesia:wread({?MXDEFER, })
+
+action(Action, <<$*, _/binary>> = ClientKey, Channel) ->
+    case mnesia:dirty_read(?MXCLIENT, ClientKey) of
+        [] ->
+            unknown_client;
+        [Client|_] ->
+            call({Action, Client, Channel})
+    end;
+
+action(Action, <<$#, _/binary>> = ChannelKey, Channel) ->
+    case mnesia:dirty_read(?MXCLIENT, ChannelKey) of
+        [] ->
+            unknown_channel_client;
+        [ChannelClient|_] ->
+            call({subscribe, ChannelClient, Channel})
+    end;
+
+action(Action, <<$@, _/binary>> = PoolKey, Channel) ->
+    case mnesia:dirty_read(?MXPOOL, PoolKey) of
+        [] ->
+            unknown_pool;
+        [Pool|_] ->
+            call({subscribe, Pool, Channel})
+    end.
