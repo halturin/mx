@@ -1,6 +1,7 @@
 deps
 ebin
 log
+logs
 .rebar
 .eunit
 *.o

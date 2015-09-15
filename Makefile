@@ -28,6 +28,9 @@ clean:
 get-deps:
 	@$(REBAR) get-deps
 
+ct:
+	@$(REBAR) skip_deps=true ct
+
 .dialyzer_plt:
 	@$(DIALYZER) --build_plt --output_plt .dialyzer_plt \
 	    --apps kernel stdlib
