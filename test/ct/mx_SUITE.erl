@@ -19,7 +19,7 @@
 %% THE SOFTWARE.
 %%
 
--module(basic_SUITE).
+-module(mx_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
 
