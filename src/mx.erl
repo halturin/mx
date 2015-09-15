@@ -111,7 +111,7 @@ client(register, Client) ->
     client(register, Client, []);
 
 client(unregister, <<$*,_/binary>> = ClientKey) ->
-    call({unregister_client, ClientKey});
+    call({unregister, ClientKey});
 
 client(info, <<$*, _/binary>> = ClientKey) ->
     call({info_client, ClientKey}).
@@ -160,7 +160,7 @@ channel(set, ChannelKey, Opts) ->
     ok.
 
 channel(unregister, <<$#,_/binary>> = ChannelKey) ->
-    call({unregister_channel, ChannelKey});
+    call({unregister, ChannelKey});
 
 channel(info, <<$#,_/binary>> = ChannelKey) ->
     call({info_channel, ChannelKey}).
@@ -172,8 +172,8 @@ pool(register, PoolName, Client) ->
 pool(set, PoolKey, Opts) ->
     ok.
 
-pool(unregister, PoolKey) ->
-    ok;
+pool(unregister, <<$@,_/binary>> = PoolKey) ->
+    call({unregister, PoolKey});
 
 pool(info, PoolName) ->
     ok.

@@ -36,7 +36,7 @@
 -define(MXCHANNEL,                  mx_table_channel).
 -define(MXPOOL,                     mx_table_pool).
 -define(MXDEFER,                    mx_table_defer).
--define(MXRELATIONS,                mx_table_relations).
+-define(MXRELATION,                mx_table_relation).
 
 -define(MXTABLES,
     [{?MXCLIENT, [{type, set},
@@ -54,10 +54,10 @@
                         {record_name, ?MXPOOL},
                         {attributes, record_info(fields, ?MXPOOL)} ]},
 
-    {?MXRELATIONS,[{type, set},
+    {?MXRELATION,[{type, set},
                         {disc_copies, [node()]},
-                        {record_name, ?MXRELATIONS},
-                        {attributes, record_info(fields, ?MXRELATIONS)} ]},
+                        {record_name, ?MXRELATION},
+                        {attributes, record_info(fields, ?MXRELATION)} ]},
 
     {?MXDEFER, [{type, bag},
                         {disc_copies, [node()]},
@@ -65,7 +65,7 @@
                         {attributes, record_info(fields, ?MXDEFER)} ]} ]).
 
 -record(?MXCLIENT, {
-    key         :: binary(),
+    key         :: binary(),            % <<$*,Md5Hash/binary>> (<<42,...>>)
     name        :: binary(),
     related     :: list(),              % subscribed/joined to
     ownerof     :: list(),              % list of keys (channels, pools)
@@ -74,7 +74,7 @@
     }).
 
 -record(?MXCHANNEL, {
-    key         :: binary(),
+    key         :: binary(),            % <<$#,Md5Hash/binary>> (<<35,...>>)
     name        :: binary(),
     related     :: list(),              % in case of tree-like subscriptions (example: pool of channels)
     owners      :: list(),              % owners (who can publish here)
@@ -85,19 +85,20 @@
     }).
 
 -record(?MXPOOL, {
-    key         :: binary(),
+    key         :: binary(),            % <<$@,Md5Hash/binary>> (<<64,...>>)
     name        :: binary(),
     related     :: list(),              % in case of tree-like pooling (example: channel of pools)
     owners      :: list(),
     balance     :: rr | hash | random,      % balance type
+    async       = true :: boolean(),        % send async
     priority    = 5 :: non_neg_integer(),
     defer       = true :: boolean(),        % deferrable
     comment     = "Pool info" :: list()
     }).
 
--record(?MXRELATIONS, {
+-record(?MXRELATION, {
     key         :: binary(),                % key of channel|pool
-    related     :: list()                   % list of clients|pools|channels
+    related     :: list()                   % list of client|pool|channel keys
     }).
 
 -record(?MXDEFER, {
