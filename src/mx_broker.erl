@@ -229,7 +229,7 @@ handle_cast({send, To, Message, Opts}, State) when is_record(To, ?MXCLIENT) ->
         Q1 ->
             pass
     end,
-    ets:insert(QueuesTable, {1, Q1}),
+    ets:insert(QueuesTable, {P, Q1}),
     {noreply, State};
 
 handle_cast({send, To, Message, Opts}, State) when is_record(To, ?MXCHANNEL) ->
