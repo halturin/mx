@@ -129,7 +129,7 @@ handle_call({register_client, Client, Opts}, From, State) ->
             {reply, {duplicate, ClientKey}, State}
     end;
 
-handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
+handle_call({register_channel, Channel, ClientKey, Opts}, From, State) ->
     case mnesia:dirty_read(?MXCLIENT, ClientKey) of
         [] ->
             {reply, unknown_client, State};
@@ -143,7 +143,7 @@ handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
                         key         = ChannelKey,
                         name        = Channel,
                         related     = [],
-                        owners      = [Client#?MXCLIENT.key],
+                        owners      = [ClientKey],
                         handler     = proplists:get_value(handler, Opts, From),
                         priority    = proplists:get_value(priority, Opts, ?MXQUEUE_PRIO_NORMAL),
                         defer       = proplists:get_value(defer, Opts, true),
@@ -168,7 +168,46 @@ handle_call({register_channel, {Channel, Opts}, ClientKey}, From, State) ->
             end
     end;
 
-handle_call({info_client, ClientKey}, _From, State) ->
+handle_call({register_pool, Pool, ClientKey, Opts}, _From, State) ->
+    case mnesia:dirty_read(?MXCLIENT, ClientKey) of
+        [] ->
+            {reply, unknown_client, State};
+        [Client|_] ->
+            PoolHash = erlang:md5(Pool),
+            PoolKey = <<$@, PoolHash/binary>>,
+            case mnesia:dirty_read(?MXPOOL, PoolKey) of
+                [] ->
+                    Pl = #?MXPOOL{
+                        key         = PoolKey,
+                        name        = Pool,
+                        related     = [],
+                        owners      = [ClientKey],
+                        balance     = proplists:get_value(balance, Opts, rr),
+                        async       = proplists:get_value(async, Opts, true),
+                        priority    = proplists:get_value(priority, Opts, ?MXQUEUE_PRIO_NORMAL),
+                        defer       = proplists:get_value(defer, Opts, true),
+                        comment     = proplists:get_value(comment, Opts, "Pool info")
+                    },
+                    Transaction = fun() ->
+                        mnesia:write(Pl),
+                        Cl = Client#?MXCLIENT{ownerof = [PoolKey| Client#?MXCLIENT.ownerof]},
+                        mnesia:write(Cl)
+                    end,
+
+                    case mnesia:transaction(Transaction) of
+                        {aborted, E} ->
+                            {reply, E, State};
+                        _ ->
+                            {reply, {poolkey, PoolKey}, State}
+                    end;
+
+                [_Pool|_] ->
+                    {reply, {duplicate, PoolKey}, State}
+
+            end
+    end;
+
+handle_call({info, <<$*,_/binary>> = ClientKey}, _From, State) ->
     ?LOG("Broker:~p", [State#state.id]),
     case mnesia:dirty_read(?MXCLIENT, ClientKey) of
         [] ->
@@ -177,12 +216,20 @@ handle_call({info_client, ClientKey}, _From, State) ->
             {reply, Client, State}
     end;
 
-handle_call({info_channel, ChannelKey}, _From, State) ->
+handle_call({info, <<$#, _/binary>> = ChannelKey}, _From, State) ->
     case mnesia:dirty_read(?MXCHANNEL, ChannelKey) of
         [] ->
             {reply, unknown_channel, State};
         [Channel|_] ->
             {reply, Channel, State}
+    end;
+
+handle_call({info, <<$@, _/binary>> = PoolKey}, _From, State) ->
+    case mnesia:dirty_read(?MXPOOL, PoolKey) of
+        [] ->
+            {reply, unknown_pool, State};
+        [Pool|_] ->
+            {reply, Pool, State}
     end;
 
 handle_call({subscribe, Client, Channel}, _From, State) ->
@@ -339,7 +386,8 @@ unregister(<<$#, _/binary>> = Key) -> % channel
         [R|_] ->
             remove_relations(R#?MXCHANNEL.related),
             remove_owning(R#?MXCHANNEL.owners),
-            mnesia:transaction(fun() -> mnesia:delete({?MXCHANNEL, Key}) end)
+            mnesia:transaction(fun() -> mnesia:delete({?MXCHANNEL, Key}) end),
+            ok
     end;
 
 unregister(<<$@, _/binary>> = Key) -> % channel
@@ -349,7 +397,8 @@ unregister(<<$@, _/binary>> = Key) -> % channel
         [R|_] ->
             remove_relations(R#?MXPOOL.related),
             remove_owning(R#?MXPOOL.owners),
-            mnesia:transaction(fun() -> mnesia:delete({?MXPOOL, Key}) end)
+            mnesia:transaction(fun() -> mnesia:delete({?MXPOOL, Key}) end),
+            ok
     end;
 
 unregister(_Key) ->

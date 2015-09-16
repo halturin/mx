@@ -18,31 +18,54 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %%
-%%         mx:client(register, Client)
-%%         mx:client(set, ClientKey, Opts)
-%%         mx:client(unregister, ClientKey)
-%%         mx:client(info, ClientKey)
-%%         mx:client(subscribe, ClientKey, ChannelName)
-%%         mx:client(unsubscribe, ClientKey, ChannelName)
-%%         mx:client(join, ClientKey, PoolName)
-%%         mx:client(leave, ClientKey, PoolName)
+%%% API
+%%%===================================================================
+%%      register(client, Name),
+%%      register(client, Name, Opts),
+%%          Name - list or binary
+%%          Opts - proplists
+%%          returns: {clientkey, Key}
+%%                   {duplicate, Key}
+%%               Key - binary
 %%
-%%         mx:channel(register, ChannelName, ClientKey) - returns ChannelKey
-%%         mx:channel(set, ChannelKey, Opts)
-%%         mx:channel(unregister, ChannelKey)
-%%         mx:channel(info, ChannelKey)
+%%      register(channel, Name, ClientKey)
+%%      register(channel, Name, ClientKey, Opts)
+%%          Name - list or binary
+%%          Opts - proplists
+%%          ClientKey - binary
+%%          returns: {channelkey, Key}
+%%                   {duplicate, Key}
 %%
+%%      register(pool, Name, ClientKey)
+%%      register(pool, Name, ClientKey, Opts)
+%%          Name - list or binary
+%%          Opts - proplists
+%%          ClientKey - binary
+%%          returns: {poolkey, Key}
+%%                   {duplicate, Key}
 %%
-%%         mx:pool(register, PoolName, ClientKey) - return PoolKey
-%%         mx:pool(set, PoolKey, Opts) - set options for the Pool
-%%         mx:pool(unregister, PoolKey)
-%%         mx:pool(info, PoolKey)
+%%      subscribe(Key, Channel)
+%%      unsubscribe(Key, Channel)
+%%          Key - binary (ClientKey, ChannelKey, PoolKey)
+%%          Channel - channel name or channel key
 %%
-%%         mx:send(ClientKey, ClientTo, Message)    - unicast message
-%%         mx:send(ChannelKey, Message)             - muilticast
-%%         mx:send(PoolKey, Message)                - pooled unicast message
+%%      join(Key, Pool)
+%%      leave(key, Pool)
+%%          Key - binary (ClientKey, ChannelKey, PoolKey)
+%%          Pool - pool name or pool key
 %%
-%%         Prefixes:
+%%      set(Key, Opts)
+%%          Key - binary (ClientKey, ChannelKey, PoolKey)
+%%          Opts - proplists
+%%
+%%      info(Key)
+%%          Key - binary (ClientKey, ChannelKey, PoolKey)
+%%
+%%      mx:send(ClientKey, Message)    - unicast message
+%%      mx:send(ChannelKey, Message)   - muilticast
+%%      mx:send(PoolKey, Message)      - pooled unicast message
+%%
+%%      Naming keys: prefix + md5(Name)
 %%              ClientKey  = <<$*, ClientHash/binary>>
 %%              ChannelKey = <<$#, ChannelHash/binary>>
 %%              PoolKey    = <<$@, PoolHash/binary>>
@@ -50,6 +73,8 @@
 -module(mx).
 
 -behaviour(gen_server).
+
+-compile({no_auto_import,[register/2]}).
 
 -export([start_link/0]).
 
@@ -60,13 +85,18 @@
          terminate/2,
          code_change/3]).
 
--export([client/2,
-         channel/2,
-         channel/3,
-         pool/2,
-         pool/3,
+-export([register/2,
+         register/3,
+         register/4,
+         unregister/1,
+         subscribe/2,
+         unsubscribe/2,
+         join/2,
+         leave/2,
          send/2,
-         send/3
+         send/3,
+         info/1,
+         set/2
         ]).
 
 %% records
@@ -76,107 +106,100 @@
 -include_lib("include/log.hrl").
 -include_lib("include/mx.hrl").
 
-%%% API
-%%%===================================================================
-client(register, {Client, Opts}) when is_list(Client)->
-    client(register, {list_to_binary(Client), Opts});
-client(register, {Client, Opts}) when is_binary(Client)->
+register(client, Client, Opts) when is_binary(Client) ->
     call({register_client, Client, Opts});
-client(register, Client) ->
-    client(register, {Client, []});
+register(X, Y, Opts) when is_list(Y) ->
+    register(X, list_to_binary(Y), Opts);
 
-client(set, {<<$*, _/binary>> = ClientKey, Opts}) ->
-    {fixme, ClientKey, Opts};
+register(channel, X, <<$*,_/binary>> = Y) ->
+    register(channel, X, Y, []);
+register(pool, X, <<$*,_/binary>> = Y) ->
+    register(pool, X, Y, []).
 
-client(unregister, <<$*,_/binary>> = ClientKey) ->
-    call({unregister, ClientKey});
+register(channel, Channel, <<$*,_/binary>> = ClientKey, Opts) when is_binary(Channel) ->
+    call({register_channel, Channel, ClientKey, Opts});
+register(pool, Pool, <<$*,_/binary>> = ClientKey, Opts) when is_binary(Pool) ->
+    call({register_pool, Pool, ClientKey, Opts});
+register(X, Y, <<$*,_/binary>> = Z, Opts) when is_list(Y) ->
+    register(X, list_to_binary(Y), Z, Opts).
 
-client(info, <<$*, _/binary>> = ClientKey) ->
-    call({info_client, ClientKey}).
-
-
-
-channel(register, {ChannelName, Opts}, <<$*, _/binary>> = ClientKey) when is_list(ChannelName) ->
-    channel(register, {list_to_binary(ChannelName), Opts}, ClientKey);
-channel(register, {ChannelName, Opts}, <<$*, _/binary>> = ClientKey) when is_binary(ChannelName) ->
-    call({register_channel, {ChannelName, Opts}, ClientKey});
-channel(register, ChannelName, <<$*, _/binary>> = ClientKey) ->
-    call({register_channel, {ChannelName,[]}, ClientKey});
-
-channel(set, ChannelKey, Opts) ->
-    {fixme, ChannelKey, Opts}.
-
-channel(unregister, <<$#,_/binary>> = ChannelKey) ->
-    call({unregister, ChannelKey});
-
-channel(info, <<$#,_/binary>> = ChannelKey) ->
-    call({info_channel, ChannelKey}).
-
-pool(register, {PoolName, Opts}, <<$*, _/binary>> = ClientKey) when is_list(PoolName) ->
-    pool(register, {list_to_binary(PoolName), Opts}, ClientKey);
-pool(register, PoolName, <<$*, _/binary>> = ClientKey) when is_list(PoolName) ->
-    pool(register, {list_to_binary(PoolName), []}, ClientKey);
-pool(register, {PoolName, Opts}, <<$*, _/binary>> = ClientKey) when is_binary(PoolName) ->
-    call({register_pool, {PoolName, Opts}, ClientKey});
-pool(register, PoolName, <<$*, _/binary>> = ClientKey) when is_binary(PoolName) ->
-    call({register_pool, {PoolName,[]}, ClientKey});
+register(client, X) ->
+    register(client, X, []).
 
 
-pool(set, PoolKey, Opts) ->
-    {fixme, PoolKey, Opts}.
+unregister(Key) ->
+    call({unregister, Key}).
 
-pool(unregister, <<$@,_/binary>> = PoolKey) ->
-    call({unregister, PoolKey});
+subscribe(Key, Channel) when is_list(Channel) ->
+    ChannelHash = erlang:md5(list_to_binary(Channel)),
+    subscribe(Key, <<$#, ChannelHash/binary>>);
 
-pool(info, <<$@, _/binary>> = PoolKey) ->
-    call({info_pool, PoolKey}).
-
-subscribe(Key, To) when is_list(To) ->
-    ToHash = erlang:md5(list_to_binary(To)),
-    subscribe(Key, <<$#, ToHash/binary>>);
-
-subscribe(Key, <<$#, _/binary>> = To) ->
-    case mnesia:dirty_read(?MXCHANNEL, To) of
+subscribe(Key, <<$#, _/binary>> = Channel) ->
+    case mnesia:dirty_read(?MXCHANNEL, Channel) of
         [] ->
             unknown_channel;
-        [Channel|_] ->
-            action(subscribe, Key, Channel)
-    end.
+        [Ch|_] ->
+            action(subscribe, Key, Ch)
+    end;
 
-unsubscribe(Key, From) when is_list(From) ->
-    FromHash = erlang:md5(list_to_binary(From)),
-    subscribe(Key, <<$#, FromHash/binary>>);
+subscribe(Key, Channel) when is_binary(Channel) ->
+    ChannelHash = erlang:md5(Channel),
+    subscribe(Key, <<$#, ChannelHash/binary>>).
 
-unsubscribe(Key, <<$#, _/binary>> = From) ->
-    case mnesia:dirty_read(?MXCHANNEL, From) of
+unsubscribe(Key, Channel) when is_list(Channel) ->
+    ChannelHash = erlang:md5(list_to_binary(Channel)),
+    subscribe(Key, <<$#, ChannelHash/binary>>);
+
+unsubscribe(Key, <<$#, _/binary>> = Channel) ->
+    case mnesia:dirty_read(?MXCHANNEL, Channel) of
         [] ->
             unknown_channel;
-        [Channel|_] ->
-            action(unsubscribe, Key, Channel)
-    end.
+        [Ch|_] ->
+            action(unsubscribe, Key, Ch)
+    end;
 
-join(Key, To) when is_list(To) ->
-    ToHash = erlang:md5(list_to_binary(To)),
-    join(Key, <<$@, ToHash/binary>>);
+unsubscribe(Key, Channel) when is_binary(Channel) ->
+    ChannelHash = erlang:md5(Channel),
+    unsubscribe(Key, <<$#, ChannelHash/binary>>).
 
-join(Key, <<$@, _/binary>> = To) ->
-    case mnesia:dirty_read(?MXPOOL, To) of
+
+join(Key, Pool) when is_list(Pool) ->
+    PoolHash = erlang:md5(list_to_binary(Pool)),
+    join(Key, <<$@, PoolHash/binary>>);
+
+join(Key, <<$@, _/binary>> = Pool) ->
+    case mnesia:dirty_read(?MXPOOL, Pool) of
         [] ->
             unknown_pool;
-        [Pool|_] ->
-            action(join, Key, Pool)
-    end.
+        [P|_] ->
+            action(join, Key, P)
+    end;
 
-leave(Key, From) when is_list(From) ->
-    FromHash = erlang:md5(list_to_binary(From)),
-    leave(Key, <<$@, FromHash/binary>>);
-leave(Key, <<$@, _/binary>> = From) ->
-    case mnesia:dirty_read(?MXPOOL, From) of
+join(Key, Pool) when is_binary(Pool) ->
+    PoolHash = erlang:md5(Pool),
+    join(Key, <<$@, PoolHash/binary>>).
+
+leave(Key, Pool) when is_list(Pool) ->
+    PoolHash = erlang:md5(list_to_binary(Pool)),
+    leave(Key, <<$@, PoolHash/binary>>);
+
+leave(Key, <<$@, _/binary>> = Pool) ->
+    case mnesia:dirty_read(?MXPOOL, Pool) of
         [] ->
             unknown_pool;
-        [Pool|_] ->
-            action(leave, Key, Pool)
-    end.
+        [P|_] ->
+            action(leave, Key, P)
+    end;
+
+leave(Key, Pool) when is_binary(Pool) ->
+    PoolHash = erlang:md5(Pool),
+    leave(Key, <<$@, PoolHash/binary>>).
+
+info(Key) ->
+    call({info, Key}).
+
+set(Key, Opts) ->
+    call({set, Key, Opts}).
 
 send(To, Message) ->
     send(To, Message, []).
@@ -252,25 +275,25 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({register_client, {Client, Opts}}, _From, State) ->
-    R = client(register, {Client, Opts}),
+handle_call({register_client, Client, Opts}, _From, State) ->
+    R = register(client, Client, Opts),
     {reply, R, State};
 handle_call({register_client, Client}, _From, State) ->
-    R = client(register, Client),
+    R = register(client, Client),
     {reply, R, State};
 
-handle_call({register_channel, {ChannelName, Opts}, ClientKey}, _From, State) ->
-    R = channel(register, {ChannelName, Opts}, ClientKey),
+handle_call({register_channel, ChannelName, ClientKey, Opts}, _From, State) ->
+    R = register(channel, ChannelName, ClientKey, Opts),
     {reply, R, State};
 handle_call({register_channel, ChannelName, ClientKey}, _From, State) ->
-    R = channel(register, ChannelName, ClientKey),
+    R = register(channel, ChannelName, ClientKey),
     {reply, R, State};
 
-handle_call({register_pool, {PoolName, Opts}, ClientKey}, _From, State) ->
-    R = pool(register, {PoolName, Opts}, ClientKey),
+handle_call({register_pool, PoolName, ClientKey, Opts}, _From, State) ->
+    R = register(pool, PoolName, ClientKey, Opts),
     {reply, R, State};
 handle_call({register_pool, PoolName, ClientKey}, _From, State) ->
-    R = pool(register, PoolName, ClientKey),
+    R = register(pool, PoolName, ClientKey),
     {reply, R, State};
 
 handle_call({unregister, Key}, _From, State) ->
@@ -291,6 +314,14 @@ handle_call({join, Client, To}, _From, State) ->
 
 handle_call({leave, Client, From}, _From, State) ->
     R = leave(Client, From),
+    {reply, R, State};
+
+handle_call({info, Key}, _From, State) ->
+    R = info(Key),
+    {reply, R, State};
+
+handle_call({set, Key, Opts}, _From, State) ->
+    R = set(Key, Opts),
     {reply, R, State};
 
 handle_call(nodes, _From, State) ->
