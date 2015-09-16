@@ -574,7 +574,6 @@ action(unrelate, Key, FromKey) ->
         unknown_relation when X == 35 -> % '#' - channel
             {not_subscribed, Key};
         unknown_relation ->
-            ?DBG("XXXXXXXXXXXXXXX: ~p", [X]),
             {not_joined, Key};
         ok ->
             action(unrelate, Key, FromKey, unrelated)
