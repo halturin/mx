@@ -232,17 +232,13 @@ handle_call({info, <<$@, _/binary>> = PoolKey}, _From, State) ->
             {reply, Pool, State}
     end;
 
-handle_call({subscribe, Client, Channel}, _From, State) ->
-    {reply, ok, State};
+handle_call({relate, Key, To}, _From, State) ->
+    R = action(relate, Key, To),
+    {reply, R, State};
 
-handle_call({unsubscribe, Client, Channel}, _From, State) ->
-    {reply, ok, State};
-
-handle_call({join, Client, Pool}, _From, State) ->
-    {reply, ok, State};
-
-handle_call({leave, Client, Pool}, _From, State) ->
-    {reply, ok, State};
+handle_call({unrelate, Key, From}, _From, State) ->
+    R = action(unrelate, Key, From),
+    {reply, R, State};
 
 handle_call({unregister, Key}, _From, State) ->
     R = unregister(Key),
@@ -373,7 +369,7 @@ unregister(<<$*,_/binary>> = ClientKey) ->
         [] ->
             unknown_client;
         [Client|_] ->
-            [unrelate(Ch, ClientKey) || Ch <- Client#?MXCLIENT.related],
+            [unrelate(ClientKey, Ch) || Ch <- Client#?MXCLIENT.related],
             [abandon(I, Client) || I <- Client#?MXCLIENT.ownerof],
             mnesia:transaction(fun() -> mnesia:delete({?MXCLIENT, ClientKey}) end),
             ok
@@ -404,28 +400,52 @@ unregister(<<$@, _/binary>> = Key) -> % channel
 unregister(_Key) ->
     unknown_key.
 
-unrelate(<<X:8/binary, _/binary>> = RelatedToKey, Key) when X =:= <<$@>>;
-                                                            X =:= <<$#>> ->
-    case mnesia:dirty_read(?MXRELATION, RelatedToKey) of
+unrelate(Key, <<$#, _/binary>> = From) ->
+    unrelate(Key, From, checked);
+
+unrelate(Key, <<$@, _/binary>> = From) ->
+    unrelate(Key, From, checked).
+
+unrelate(Key, From, checked) ->
+    case mnesia:dirty_read(?MXRELATION, From) of
         [] ->
-            ok;
+            unknown_relation;
         [Relation|_] ->
-            Related = lists:delete(Key, Relation#?MXRELATION.related),
-            UpdatedRelation = Relation#?MXRELATION{related = Related},
-            mnesia:transaction(fun() -> mnesia:write(UpdatedRelation) end),
-            ok
+            case lists:member(Key, Relation#?MXRELATION.related) of
+                false ->
+                    unknown_relation;
+                true ->
+                    Related = lists:delete(Key, Relation#?MXRELATION.related),
+                    UpdatedRelation = Relation#?MXRELATION{related = Related},
+                    mnesia:transaction(fun() -> mnesia:write(UpdatedRelation) end),
+                    ok
+            end
     end.
 
-relate(<<X:8/binary, _/binary>> = RelateToKey, Key) when X =:= <<$@>>;
-                                                         X =:= <<$#>> ->
-    case mnesia:dirty_read(?MXRELATION, RelateToKey) of
+relate(Key, <<$#, _/binary>> = To) ->
+    relate(Key, To, checked);
+
+relate(Key, <<$@, _/binary>> = To) ->
+    relate(Key, To, checked).
+
+relate(Key, To, checked) ->
+    case mnesia:dirty_read(?MXRELATION, To) of
         [] ->
-            ok;
+            Relation = #?MXRELATION{
+                key     = To,
+                related = []
+            };
         [Relation|_] ->
+            ok
+    end,
+    case lists:member(Key, Relation#?MXRELATION.related) of
+        false ->
             Related = [Key | Relation#?MXRELATION.related],
             UpdatedRelation = Relation#?MXRELATION{related = Related},
             mnesia:transaction(fun() -> mnesia:write(UpdatedRelation) end),
-            ok
+            ok;
+        true ->
+            related
     end.
 
 remove_relations(Relations) ->
@@ -539,4 +559,89 @@ defer(Priority, To, Message) ->
     },
     mnesia:transaction(fun() -> mnesia:write(Defer) end).
 
+action(relate, Key, ToKey) ->
+    case relate(Key, <<X:8,_/binary>> = ToKey) of
+        related when X == 35 -> % '#' - channel
+            {already_subscribed, Key};
+        related ->
+            {already_joined, Key};
+        ok ->
+            action(relate, Key, ToKey, related)
+    end;
 
+action(unrelate, Key, FromKey) ->
+    case unrelate(Key, <<X:8,_/binary>> = FromKey) of
+        unknown_relation when X == 35 -> % '#' - channel
+            {not_subscribed, Key};
+        unknown_relation ->
+            ?DBG("XXXXXXXXXXXXXXX: ~p", [X]),
+            {not_joined, Key};
+        ok ->
+            action(unrelate, Key, FromKey, unrelated)
+    end.
+
+action(relate, <<$*, _/binary>> = Key, ToKey, related) ->
+    case mnesia:dirty_read(?MXCLIENT, Key) of
+        [] ->
+            unknown_client;
+        [Client|_] ->
+            Related = [ToKey | Client#?MXCLIENT.related],
+            UpdatedClient = Client#?MXCLIENT{related = Related},
+            mnesia:transaction(fun() -> mnesia:write(UpdatedClient) end),
+            ok
+    end;
+
+action(relate, <<$#, _/binary>> = Key, ToKey, related) ->
+   case mnesia:dirty_read(?MXCHANNEL, Key) of
+        [] ->
+            unknown_channel_client;
+        [Channel|_] ->
+            Related = [ToKey | Channel#?MXCHANNEL.related],
+            UpdatedChannel = Channel#?MXCHANNEL{related = Related},
+            mnesia:transaction(fun() -> mnesia:write(UpdatedChannel) end),
+            ok
+    end;
+
+action(relate, <<$@, _/binary>> = Key, ToKey, related) ->
+    case mnesia:dirty_read(?MXPOOL, Key) of
+        [] ->
+            unknown_pool_client;
+        [Pool|_] ->
+            Related = [ToKey | Pool#?MXPOOL.related],
+            UpdatedPool = Pool#?MXPOOL{related = Related},
+            mnesia:transaction(fun() -> mnesia:write(UpdatedPool) end),
+            ok
+    end;
+
+action(unrelate, <<$*, _/binary>> = Key, FromKey, unrelated) ->
+    case mnesia:dirty_read(?MXCLIENT, Key) of
+        [] ->
+            unknown_client;
+        [Client|_] ->
+            Related = lists:delete(FromKey, Client#?MXCLIENT.related),
+            UpdatedClient = Client#?MXCLIENT{related = Related},
+            mnesia:transaction(fun() -> mnesia:write(UpdatedClient) end),
+            ok
+    end;
+
+action(unrelate, <<$#, _/binary>> = Key, FromKey, unrelated) ->
+   case mnesia:dirty_read(?MXCHANNEL, Key) of
+        [] ->
+            unknown_channel_client;
+        [Channel|_] ->
+            Related = Related = lists:delete(FromKey, Channel#?MXCHANNEL.related),
+            UpdatedChannel = Channel#?MXCHANNEL{related = Related},
+            mnesia:transaction(fun() -> mnesia:write(UpdatedChannel) end),
+            ok
+    end;
+
+action(unrelate, <<$@, _/binary>> = Key, FromKey, unrelated) ->
+    case mnesia:dirty_read(?MXPOOL, Key) of
+        [] ->
+            unknown_pool_client;
+        [Pool|_] ->
+            Related = Related = lists:delete(FromKey, Pool#?MXPOOL.related),
+            UpdatedPool = Pool#?MXPOOL{related = Related},
+            mnesia:transaction(fun() -> mnesia:write(UpdatedPool) end),
+            ok
+    end.

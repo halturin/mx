@@ -65,20 +65,20 @@
                         {attributes, record_info(fields, ?MXDEFER)} ]} ]).
 
 -record(?MXCLIENT, {
-    key         :: binary(),            % <<$*,Md5Hash/binary>> (<<42,...>>)
+    key         :: binary(),          % <<$*,Md5Hash/binary>> (<<42,...>>)
     name        :: binary(),
-    related     :: list(),              % subscribed/joined to
-    ownerof     :: list(),              % list of keys (channels, pools)
-    handler     :: pid() | offline,     % who manage the client (for recieving messages)
+    related     :: list(),            % subscribed/joined to
+    ownerof     :: list(),            % list of keys (channels, pools)
+    handler     :: pid() | offline,   % who manage the client (for recieving messages)
     comment     = "Client info" :: list()
     }).
 
 -record(?MXCHANNEL, {
-    key         :: binary(),            % <<$#,Md5Hash/binary>> (<<35,...>>)
+    key         :: binary(),          % <<$#,Md5Hash/binary>> (<<35,...>>)
     name        :: binary(),
-    related     :: list(),              % in case of tree-like subscriptions (example: pool of channels)
-    owners      :: list(),              % owners (who can publish here)
-    handler     :: pid(),               % who manage the last mile to the client (WebSocket, email, sms etc.)
+    related     :: list(),            % in case of tree-like subscriptions (example: pool of channels)
+    owners      :: list(),            % owners (who can publish here)
+    handler     :: pid() | offline ,  % who manage the last mile to the client (WebSocket, email, sms etc.)
     priority    = 5 :: non_neg_integer(),   % priority
     defer       = true :: boolean(),        % deferrable
     comment     = "Channel info" :: list()

@@ -134,12 +134,12 @@ subscribe(Key, Channel) when is_list(Channel) ->
     ChannelHash = erlang:md5(list_to_binary(Channel)),
     subscribe(Key, <<$#, ChannelHash/binary>>);
 
-subscribe(Key, <<$#, _/binary>> = Channel) ->
-    case mnesia:dirty_read(?MXCHANNEL, Channel) of
+subscribe(Key, <<$#, _/binary>> = ChannelKey) ->
+    case mnesia:dirty_read(?MXCHANNEL, ChannelKey) of
         [] ->
             unknown_channel;
-        [Ch|_] ->
-            action(subscribe, Key, Ch)
+        [_Ch|_] ->
+            call({relate, Key, ChannelKey})
     end;
 
 subscribe(Key, Channel) when is_binary(Channel) ->
@@ -148,14 +148,14 @@ subscribe(Key, Channel) when is_binary(Channel) ->
 
 unsubscribe(Key, Channel) when is_list(Channel) ->
     ChannelHash = erlang:md5(list_to_binary(Channel)),
-    subscribe(Key, <<$#, ChannelHash/binary>>);
+    unsubscribe(Key, <<$#, ChannelHash/binary>>);
 
-unsubscribe(Key, <<$#, _/binary>> = Channel) ->
-    case mnesia:dirty_read(?MXCHANNEL, Channel) of
+unsubscribe(Key, <<$#, _/binary>> = ChannelKey) ->
+    case mnesia:dirty_read(?MXCHANNEL, ChannelKey) of
         [] ->
             unknown_channel;
-        [Ch|_] ->
-            action(unsubscribe, Key, Ch)
+        [_Ch|_] ->
+            call({unrelate, Key, ChannelKey})
     end;
 
 unsubscribe(Key, Channel) when is_binary(Channel) ->
@@ -167,12 +167,12 @@ join(Key, Pool) when is_list(Pool) ->
     PoolHash = erlang:md5(list_to_binary(Pool)),
     join(Key, <<$@, PoolHash/binary>>);
 
-join(Key, <<$@, _/binary>> = Pool) ->
-    case mnesia:dirty_read(?MXPOOL, Pool) of
+join(Key, <<$@, _/binary>> = PoolKey) ->
+    case mnesia:dirty_read(?MXPOOL, PoolKey) of
         [] ->
             unknown_pool;
-        [P|_] ->
-            action(join, Key, P)
+        [_P|_] ->
+            call({relate, Key, PoolKey})
     end;
 
 join(Key, Pool) when is_binary(Pool) ->
@@ -183,12 +183,12 @@ leave(Key, Pool) when is_list(Pool) ->
     PoolHash = erlang:md5(list_to_binary(Pool)),
     leave(Key, <<$@, PoolHash/binary>>);
 
-leave(Key, <<$@, _/binary>> = Pool) ->
-    case mnesia:dirty_read(?MXPOOL, Pool) of
+leave(Key, <<$@, _/binary>> = PoolKey) ->
+    case mnesia:dirty_read(?MXPOOL, PoolKey) of
         [] ->
             unknown_pool;
-        [P|_] ->
-            action(leave, Key, P)
+        [_P|_] ->
+            call({unrelate, Key, PoolKey})
     end;
 
 leave(Key, Pool) when is_binary(Pool) ->
@@ -464,27 +464,3 @@ requeue() ->
     % еще надо учесть загруженность очередей, ежели они в перегрузке (>high_threshold) то пропускать.
     % lists:map(fun(M) ->
     % mnesia:wread({?MXDEFER, })
-
-action(Action, <<$*, _/binary>> = ClientKey, Channel) ->
-    case mnesia:dirty_read(?MXCLIENT, ClientKey) of
-        [] ->
-            unknown_client;
-        [Client|_] ->
-            call({Action, Client, Channel})
-    end;
-
-action(Action, <<$#, _/binary>> = ChannelKey, Channel) ->
-    case mnesia:dirty_read(?MXCLIENT, ChannelKey) of
-        [] ->
-            unknown_channel_client;
-        [ChannelClient|_] ->
-            call({Action, ChannelClient, Channel})
-    end;
-
-action(Action, <<$@, _/binary>> = PoolKey, Channel) ->
-    case mnesia:dirty_read(?MXPOOL, PoolKey) of
-        [] ->
-            unknown_pool;
-        [Pool|_] ->
-            call({Action, Pool, Channel})
-    end.
