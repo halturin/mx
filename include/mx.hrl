@@ -70,6 +70,8 @@
     related     :: list(),            % subscribed/joined to
     ownerof     :: list(),            % list of keys (channels, pools)
     handler     :: pid() | offline,   % who manage the client (for recieving messages)
+    async       = true :: boolean(),  % send async or wait for 'ok' message
+    defer       = false :: boolean(), % defer message when the handler is not available (offline)
     comment     = "Client info" :: list()
     }).
 
@@ -78,9 +80,8 @@
     name        :: binary(),
     related     :: list(),            % in case of tree-like subscriptions (example: pool of channels)
     owners      :: list(),            % owners (who can publish here)
-    handler     :: pid() | offline ,  % who manage the last mile to the client (WebSocket, email, sms etc.)
     priority    = 5 :: non_neg_integer(),   % priority
-    defer       = true :: boolean(),        % deferrable
+    defer       = true :: boolean(),        % deferrable. defer message when exceed the queue limit
     comment     = "Channel info" :: list()
     }).
 
@@ -90,7 +91,6 @@
     related     :: list(),              % in case of tree-like pooling (example: channel of pools)
     owners      :: list(),
     balance     = rr :: rr | hash | random,      % balance type
-    async       = true :: boolean(),        % send async
     priority    = 5 :: non_neg_integer(),
     defer       = true :: boolean(),        % deferrable
     comment     = "Pool info" :: list()
@@ -98,7 +98,7 @@
 
 -record(?MXRELATION, {
     key         :: binary(),                % key of channel|pool
-    related     :: list()                   % list of client|pool|channel keys
+    related     = [] :: list()                   % list of client|pool|channel keys
     }).
 
 -record(?MXDEFER, {

@@ -105,7 +105,7 @@ init([I, _Opts]) ->
 %% @end
 %%--------------------------------------------------------------------
 
-handle_call({register_client, Client, Opts}, From, State) ->
+handle_call({register_client, Client, Opts}, {Pid, _}, State) ->
     ClientHash  = erlang:md5(Client),
     ClientKey   = <<$*, ClientHash/binary>>,
     case mnesia:dirty_read(?MXCLIENT, ClientKey) of
@@ -115,7 +115,9 @@ handle_call({register_client, Client, Opts}, From, State) ->
                 key      = ClientKey,
                 related  = [],
                 ownerof  = [],
-                handler  = proplists:get_value(handler, Opts, From),
+                handler  = proplists:get_value(handler, Opts, Pid),
+                async    = proplists:get_value(async, Opts, true),
+                defer    = proplists:get_value(defer, Opts, false),
                 comment  = proplists:get_value(comment, Opts, "Client info")
             },
 
@@ -129,7 +131,7 @@ handle_call({register_client, Client, Opts}, From, State) ->
             {reply, {duplicate, ClientKey}, State}
     end;
 
-handle_call({register_channel, Channel, ClientKey, Opts}, From, State) ->
+handle_call({register_channel, Channel, ClientKey, Opts}, _From, State) ->
     case mnesia:dirty_read(?MXCLIENT, ClientKey) of
         [] ->
             {reply, unknown_client, State};
@@ -144,7 +146,6 @@ handle_call({register_channel, Channel, ClientKey, Opts}, From, State) ->
                         name        = Channel,
                         related     = [],
                         owners      = [ClientKey],
-                        handler     = proplists:get_value(handler, Opts, From),
                         priority    = proplists:get_value(priority, Opts, ?MXQUEUE_PRIO_NORMAL),
                         defer       = proplists:get_value(defer, Opts, true),
                         comment     = proplists:get_value(comment, Opts, "Channel info")
@@ -183,7 +184,6 @@ handle_call({register_pool, Pool, ClientKey, Opts}, _From, State) ->
                         related     = [],
                         owners      = [ClientKey],
                         balance     = proplists:get_value(balance, Opts, rr),
-                        async       = proplists:get_value(async, Opts, true),
                         priority    = proplists:get_value(priority, Opts, ?MXQUEUE_PRIO_NORMAL),
                         defer       = proplists:get_value(defer, Opts, true),
                         comment     = proplists:get_value(comment, Opts, "Pool info")
@@ -510,18 +510,63 @@ dispatch(Q, N, HasMessages) ->
     case mx_queue:get(Q) of
         {empty, Q1} ->
             {Q1, HasMessages};
-        {{value, {_, {To, Message}}}, Q1} when is_record(To, ?MXCLIENT) ->
+        {{value, {_, {To, Message}}}, Q1} when  is_record(To, ?MXCLIENT),
+                                                is_pid(To#?MXCLIENT.handler) ->
             ?DBG("Dispatch to the client: ~p [MESSAGE: ~p]", [To, Message]),
-
+            To#?MXCLIENT.handler ! Message,
             dispatch(Q1, N - 1, true);
-        {{value, {_, {To, Message}}}, Q1} when is_record(To, ?MXCHANNEL) ->
-            ?DBG("Dispatch to channel subscribers: ~p [MESSAGE: ~p]", [To, Message]),
 
+        {{value, {_, {To, Message}}}, Q1} when  is_record(To, ?MXCLIENT),
+                                                 To#?MXCLIENT.defer == true ->
+            ?DBG("Client is offline: ~p. Defer this message.", [To#?MXCLIENT.name]),
+            defer(1, To#?MXCLIENT.key, Message),
+            dispatch(Q1, N - 1, true);
+
+        {{value, {_, {To, _Message}}}, Q1} when  is_record(To, ?MXCLIENT) ->
+            ?DBG("Client is offline [~p]. Deferring is disabled. Drop this message.", [To#?MXCLIENT.name]),
+            dispatch(Q1, N - 1, true);
+
+        {{value, {_, {To, Message}}}, Q1} when is_record(To, ?MXCHANNEL) ->
+            case mnesia:dirty_read(?MXRELATION, To#?MXCHANNEL.key) of
+                [] ->
+                    pass; % have no recievers
+                [Relations | _] when Relations#?MXRELATION.related == [] ->
+                    pass; % have no recievers
+                [Relations | _] ->
+                    ?DBG("Dispatch message to the channel [~p]. Send times [~p] ",
+                        [To#?MXCHANNEL.name, length(Relations#?MXRELATION.related)]),
+                    [mx:send(X, Message) || X <- Relations#?MXRELATION.related]
+            end,
             dispatch(Q1, N - 1, true);
 
         {{value, {_, {To, Message}}}, Q1} when is_record(To, ?MXPOOL) ->
-            ?DBG("Dispatch to the pool: ~p [MESSAGE: ~p]", [To, Message]),
-
+            case mnesia:dirty_read(?MXRELATION, To#?MXPOOL.key) of
+                [] ->
+                    pass; % have no recievers
+                [Relations|_] when Relations#?MXRELATION.related == [] ->
+                    pass; % have no recievers
+                [Relations|_] when To#?MXPOOL.balance == rr ->
+                    N = 1, % FIXME!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    X = lists:nth(N, Relations#?MXRELATION.related),
+                    ?DBG("Dispatch message to the pool [~p]. Send to [~p] of [~p] ",
+                        [To#?MXPOOL.name, N, length(Relations#?MXRELATION.related)]),
+                    mx:send(X, Message);
+                [Relations|_] when To#?MXPOOL.balance == random ->
+                    N = random:uniform(length(Relations#?MXRELATION.related)),
+                    X = lists:nth(N, Relations#?MXRELATION.related),
+                    ?DBG("Dispatch message to the pool [~p]. Send to [~p] of [~p] ",
+                        [To#?MXPOOL.name, N, length(Relations#?MXRELATION.related)]),
+                    mx:send(X, Message);
+                [Relations|_] when To#?MXPOOL.balance == hash ->
+                    N = erlang:phash(Message, length(Relations#?MXRELATION.related)),
+                    X = lists:nth(N, Relations#?MXRELATION.related),
+                    ?DBG("Dispatch message to the pool [~p]. Send to [~p] of [~p] ",
+                        [To#?MXPOOL.name, N, length(Relations#?MXRELATION.related)]),
+                    mx:send(X, Message)
+            end,
+            dispatch(Q1, N - 1, true);
+        {FIXME, Q1} ->
+            ?DBG("FIXME: ~p", [FIXME]),
             dispatch(Q1, N - 1, true)
     end.
 
@@ -536,15 +581,17 @@ dispatch(QueuesTable) ->
                         ets:insert(QueuesTable, {P, Q1}),
                         true;
                     {_, false} ->
-                        HasMessagesAcc
+                        HasMessagesAcc;
+
+                    FIXME ->
+                        ?DBG("FIXME: ~p", [FIXME]),
+                        false
                 end
             end, false, lists:seq(1, 10)) of
         true ->
-            ?DBG("Queue have messages... cast 'dispatch' immediately"),
             0; % cast 'dispatch' immediately
         false ->
-            ?DBG("Wait for new message..."),
-            5000 % FIXME later. wait 50 ms before 'dispatch casting'
+            100 % FIXME later. wait 50 ms before 'dispatch casting'
     end.
 
 
