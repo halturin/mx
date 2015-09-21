@@ -1,12 +1,13 @@
 # OTP Message Broker
 
 ## Overview
-    Universal OTP messaging broker allows create channels (pub/sub), pools, 
+    Universal OTP messaging broker allows create channels (pub/sub), pools,
     mixing it (pool of channels, channel of pools) and even crazy complex messaging
-    (something like: pool of [pool of [...], clients, channels of [...]]). 
+    (something like: pool of [pool of [...], clients, channels of [...]]).
 
-    You can set priority for processing (priority range: 1..10). Pool have 3 balance 
-    methods: rr(round robin), hash (by erlang:phash(Message, lenth(Pool))), random.
+    You can set priority for message processing (range: 1..10).
+
+    Pool have 3 balance methods: rr(round robin), hash (by erlang:phash(Message, lenth(Pool))), random.
 
     Message can be deferred on:
 
