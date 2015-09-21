@@ -102,7 +102,7 @@ now you can call mx:nodes() to get list of mx cluster nodes.
 
 ### remote use
 
-You have to use gen_server call. List of allowed messages is bellow**
+You have to use gen_server call. List of allowed messages is bellow  
     **gen_server:call(Node, Message)**
 
     Node: mx@nodename  
