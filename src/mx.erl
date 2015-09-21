@@ -23,7 +23,7 @@
 
 -behaviour(gen_server).
 
--compile({no_auto_import,[register/2]}).
+-compile({no_auto_import,[register/2, nodes/0]}).
 
 -export([start_link/0]).
 
@@ -46,7 +46,8 @@
          send/3,
          info/1,
          set/2,
-         flush/1
+         flush/1,
+         nodes/0
         ]).
 
 %% records
@@ -187,6 +188,9 @@ flush(all) ->
 flush(Key) ->
     cast({flush, Key}).
 
+nodes() ->
+    mx_mnesia:nodes().
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the server
@@ -281,7 +285,7 @@ handle_call({set, Key, Opts}, _From, State) ->
     {reply, R, State};
 
 handle_call(nodes, _From, State) ->
-    R = mx_mnesia:nodes(),
+    R = nodes(),
     {reply, R, State};
 
 handle_call({send, To, Message}, _From, State) ->
