@@ -120,7 +120,7 @@ You have to use **gen_server:call(MX, Message)**, where
 - {set, Key, Opts}
 - nodes
 
-  > (mxnode02@127.0.0.1)2> gen_server:call({mx, 'mxnode01@127.0.0.1'}, nodes).
+> (mxnode02@127.0.0.1)2> gen_server:call({mx, 'mxnode01@127.0.0.1'}, nodes).
 ['mxnode02@127.0.0.1','mxnode01@127.0.0.1']
 
 
