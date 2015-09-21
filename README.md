@@ -98,11 +98,6 @@ now you can call mx:nodes() to get list of mx cluster nodes.
     **mx:nodes()**  
         show MX cluster nodes
 
-* Naming keys  
-    prefix + md5(Name)  
-    *ClientKey  = <<$*, ClientHash/binary>>*  
-    *ChannelKey = <<$#, ChannelHash/binary>>*  
-    *PoolKey    = <<$@, PoolHash/binary>>*
 
 ## Examples
 
