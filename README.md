@@ -15,7 +15,8 @@
 
     2) client has 'offline' state and the 'defer' option is set to 'true'
 
-    You have to set 'async' option to 'false' value to ensure the message has been delivered.
+    You have to set 'async' Client option to 'false' for delivery control. Default value of
+    this option is 'true'.
 
 ## Distributed mode
 
