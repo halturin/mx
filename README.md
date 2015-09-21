@@ -122,7 +122,7 @@ List of allowed messages is bellow
     - {send, To, Message}
     - {info, Key}
     - {set, Key, Opts}
-    *nodes
+    - nodes
 
 
 
