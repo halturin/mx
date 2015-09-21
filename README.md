@@ -37,6 +37,7 @@ now you can call mx:nodes() to get list of mx cluster nodes.
 ## API
 
 * Create client/channel/pool
+
   **register(client, Name)**
   **register(client, Name, Opts)**
     Name - list or binary
