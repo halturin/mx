@@ -1,6 +1,7 @@
 # OTP Message Broker
 
 ## Overview
+
     Universal OTP message broker allows to create channels (pub/sub), pools,
     mixing it (pool of channels, channel of pools) and even create crazy complex messaging
     (something like: pool of [pool of [...], clients, channels of [...]]).
