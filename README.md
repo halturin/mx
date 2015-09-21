@@ -106,39 +106,24 @@ You have to use gen_server call
     **gen_server:call(Node, Message)**
 
 List of allowed messages is bellow  
-    *Node*: 'mx@nodename'  
-    *Message*:  
-    * {register_client, Client}
-
-    * {register_client, Client, Opts}
-
-    * {register_channel, ChannelName, ClientKey}
-
-    * {register_channel, ChannelName, ClientKey, Opts}
-
-    * {register_pool, PoolName, ClientKey}
-
-    * {register_pool, PoolName, ClientKey, Opts}
-
-    * {unregister, Key}
-
-    * {subscribe, Client, To}
-
-    * {unsubscribe, Client, From}
-
-    * {join, Client, To}
-
-    * {leave, Client, From}
-
-    * {send, To, Message}
-
-    * {info, Key}
-
-    * {set, Key, Opts}
-
-    * nodes
-
-
+    - *Node*:
+        - 'mx@nodename'
+    - *Message*:
+      - {register_client, Client}
+      - {register_client, Client, Opts}
+      - {register_channel, ChannelName, ClientKey}
+      - {register_channel, ChannelName, ClientKey, Opts}
+      - {register_pool, PoolName, ClientKey}
+      - {register_pool, PoolName, ClientKey, Opts}
+      - {unregister, Key}
+      - {subscribe, Client, To}
+      - {unsubscribe, Client, From}
+      - {join, Client, To}
+      - {leave, Client, From}
+      - {send, To, Message}
+      - {info, Key}
+      - {set, Key, Opts}
+      - nodes
 
 ## Examples
 
