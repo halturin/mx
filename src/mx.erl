@@ -65,6 +65,10 @@
 %%      mx:send(ChannelKey, Message)   - muilticast
 %%      mx:send(PoolKey, Message)      - pooled unicast message
 %%
+%%      mx:flush(Key)
+%%          Key - binary (ClientKey, ChannelKey, PoolKey)
+%%          all - truncate the 'deferred' table
+%%
 %%      Naming keys: prefix + md5(Name)
 %%              ClientKey  = <<$*, ClientHash/binary>>
 %%              ChannelKey = <<$#, ChannelHash/binary>>
@@ -96,7 +100,8 @@
          send/2,
          send/3,
          info/1,
-         set/2
+         set/2,
+         flush/1
         ]).
 
 %% records
@@ -138,7 +143,7 @@ subscribe(Key, <<$#, _/binary>> = ChannelKey) ->
     case mnesia:dirty_read(?MXCHANNEL, ChannelKey) of
         [] ->
             unknown_channel;
-        [_Ch|_] ->
+        [_Ch] ->
             call({relate, Key, ChannelKey})
     end;
 
@@ -154,7 +159,7 @@ unsubscribe(Key, <<$#, _/binary>> = ChannelKey) ->
     case mnesia:dirty_read(?MXCHANNEL, ChannelKey) of
         [] ->
             unknown_channel;
-        [_Ch|_] ->
+        [_Ch] ->
             call({unrelate, Key, ChannelKey})
     end;
 
@@ -171,7 +176,7 @@ join(Key, <<$@, _/binary>> = PoolKey) ->
     case mnesia:dirty_read(?MXPOOL, PoolKey) of
         [] ->
             unknown_pool;
-        [_P|_] ->
+        [_P] ->
             call({relate, Key, PoolKey})
     end;
 
@@ -187,7 +192,7 @@ leave(Key, <<$@, _/binary>> = PoolKey) ->
     case mnesia:dirty_read(?MXPOOL, PoolKey) of
         [] ->
             unknown_pool;
-        [_P|_] ->
+        [_P] ->
             call({unrelate, Key, PoolKey})
     end;
 
@@ -208,7 +213,7 @@ send(<<$*, _/binary>> = ClientKeyTo, Message, Opts) ->
     case mnesia:dirty_read(?MXCLIENT, ClientKeyTo) of
         [] ->
             unknown_client;
-        [ClientTo|_] ->
+        [ClientTo] ->
             cast({send, ClientTo, Message, Opts})
     end;
 
@@ -216,7 +221,7 @@ send(<<$#, _/binary>> = ChannelKeyTo, Message, Opts) ->
     case mnesia:dirty_read(?MXCHANNEL, ChannelKeyTo) of
         [] ->
             unknown_channel;
-        [ChannelTo|_] ->
+        [ChannelTo] ->
             cast({send, ChannelTo, Message, Opts})
     end;
 
@@ -224,12 +229,18 @@ send(<<$@, _/binary>> = PoolKeyTo, Message, Opts) ->
     case mnesia:dirty_read(?MXPOOL, PoolKeyTo) of
         [] ->
             unknown_pool;
-        [PoolTo|_] ->
+        [PoolTo] ->
             cast({send, PoolTo, Message, Opts})
     end;
 
 send(_, _, _) ->
     unknown_receiver.
+
+flush(all) ->
+    mnesia:clear_table(?MXDEFER);
+
+flush(Key) ->
+    cast({flush, Key}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -451,10 +462,8 @@ requeue() ->
                     end
                 end, false, lists:seq(1, 10)) of
         true ->
-            ?DBG("Queue have messages... cast 'dispatch' immediately"),
             0; % cast 'dispatch' immediately
         false ->
-            ?DBG("Wait for deferred message..."),
             5000 % FIXME later. wait 50 ms before 'dispatch requeue'
     end.
 

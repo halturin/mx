@@ -21,7 +21,7 @@
 
 -module(mx_queue).
 
--export([new/1, put/2, get/1, pop/1, is_empty/1, len/1, total/1]).
+-export([new/1, put/2, get/1, pop/1, is_empty/1, len/1, total/1, name/1]).
 
 %% includes
 -include_lib("include/log.hrl").
@@ -101,6 +101,7 @@ is_empty(#mxq{length = _})  -> false.
 
 len(#mxq{length = L})       -> L.
 total(#mxq{total = T})      -> T.
+name(#mxq{name = N})        -> N.
 
 alarm() ->
     alarm(alarm_clear).

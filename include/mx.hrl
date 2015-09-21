@@ -36,7 +36,10 @@
 -define(MXCHANNEL,                  mx_table_channel).
 -define(MXPOOL,                     mx_table_pool).
 -define(MXDEFER,                    mx_table_defer).
--define(MXRELATION,                mx_table_relation).
+-define(MXRELATION,                 mx_table_relation).
+-define(MXKV,                       mx_table_kv).
+
+-define(MX_SEND_TIMEOUT,            5000). % sync sending timeout
 
 -define(MXTABLES,
     [{?MXCLIENT, [{type, set},
@@ -62,7 +65,12 @@
     {?MXDEFER, [{type, bag},
                         {disc_copies, [node()]},
                         {record_name, ?MXDEFER},
-                        {attributes, record_info(fields, ?MXDEFER)} ]} ]).
+                        {attributes, record_info(fields, ?MXDEFER)} ]},
+
+    {?MXKV,[{type, set},
+                        {disc_copies, [node()]},
+                        {record_name, ?MXKV},
+                        {attributes, record_info(fields, ?MXKV)} ]} ]).
 
 -record(?MXCLIENT, {
     key         :: binary(),          % <<$*,Md5Hash/binary>> (<<42,...>>)
@@ -106,6 +114,11 @@
     message,
     priority    :: non_neg_integer(),
     fails       = 0 :: non_neg_integer()    % count of sending fails
+    }).
+
+-record(?MXKV, {
+    key,
+    value
     }).
 
 -endif. % MX_HRL

@@ -127,7 +127,7 @@ handle_call({register_client, Client, Opts}, {Pid, _}, State) ->
                 _ ->
                     {reply, {clientkey, ClientKey}, State}
             end;
-        [_Client | _] ->
+        [_Client] ->
             {reply, {duplicate, ClientKey}, State}
     end;
 
@@ -136,7 +136,7 @@ handle_call({register_channel, Channel, ClientKey, Opts}, _From, State) ->
         [] ->
             {reply, unknown_client, State};
 
-        [Client|_] ->
+        [Client] ->
             ChannelHash = erlang:md5(Channel),
             ChannelKey  = <<$#, ChannelHash/binary>>,
             case mnesia:dirty_read(?MXCHANNEL, ChannelKey) of
@@ -164,7 +164,7 @@ handle_call({register_channel, Channel, ClientKey, Opts}, _From, State) ->
                             {reply, {channelkey, ChannelKey}, State}
                     end;
 
-                [_Channel|_] ->
+                [_Channel] ->
                     {reply, {duplicate, ChannelKey}, State}
             end
     end;
@@ -173,7 +173,7 @@ handle_call({register_pool, Pool, ClientKey, Opts}, _From, State) ->
     case mnesia:dirty_read(?MXCLIENT, ClientKey) of
         [] ->
             {reply, unknown_client, State};
-        [Client|_] ->
+        [Client] ->
             PoolHash = erlang:md5(Pool),
             PoolKey = <<$@, PoolHash/binary>>,
             case mnesia:dirty_read(?MXPOOL, PoolKey) of
@@ -201,7 +201,7 @@ handle_call({register_pool, Pool, ClientKey, Opts}, _From, State) ->
                             {reply, {poolkey, PoolKey}, State}
                     end;
 
-                [_Pool|_] ->
+                [_Pool] ->
                     {reply, {duplicate, PoolKey}, State}
 
             end
@@ -212,7 +212,7 @@ handle_call({info, <<$*,_/binary>> = ClientKey}, _From, State) ->
     case mnesia:dirty_read(?MXCLIENT, ClientKey) of
         [] ->
             {reply, unknown_client, State};
-        [Client|_] ->
+        [Client] ->
             {reply, Client, State}
     end;
 
@@ -220,7 +220,7 @@ handle_call({info, <<$#, _/binary>> = ChannelKey}, _From, State) ->
     case mnesia:dirty_read(?MXCHANNEL, ChannelKey) of
         [] ->
             {reply, unknown_channel, State};
-        [Channel|_] ->
+        [Channel] ->
             {reply, Channel, State}
     end;
 
@@ -228,7 +228,7 @@ handle_call({info, <<$@, _/binary>> = PoolKey}, _From, State) ->
     case mnesia:dirty_read(?MXPOOL, PoolKey) of
         [] ->
             {reply, unknown_pool, State};
-        [Pool|_] ->
+        [Pool] ->
             {reply, Pool, State}
     end;
 
@@ -315,6 +315,10 @@ handle_cast(dispatch, State) ->
     erlang:send_after(Timeout, self(), {'$gen_cast', dispatch}),
     {noreply, State};
 
+handle_cast({flush, Key}, State) ->
+    mnesia:delete({?MXDEFER, Key}),
+    {noreply, State};
+
 handle_cast(Msg, State) ->
     ?ERR("unhandled cast: ~p", [Msg]),
     {noreply, State}.
@@ -368,7 +372,7 @@ unregister(<<$*,_/binary>> = ClientKey) ->
         case mnesia:dirty_read(?MXCLIENT, ClientKey) of
         [] ->
             unknown_client;
-        [Client|_] ->
+        [Client] ->
             [unrelate(ClientKey, Ch) || Ch <- Client#?MXCLIENT.related],
             [abandon(I, Client) || I <- Client#?MXCLIENT.ownerof],
             mnesia:transaction(fun() -> mnesia:delete({?MXCLIENT, ClientKey}) end),
@@ -379,7 +383,7 @@ unregister(<<$#, _/binary>> = Key) -> % channel
     case mnesia:dirty_read(?MXCHANNEL, Key) of
         [] ->
             unknown_channel;
-        [R|_] ->
+        [R] ->
             remove_relations(R#?MXCHANNEL.related),
             remove_owning(R#?MXCHANNEL.owners),
             mnesia:transaction(fun() -> mnesia:delete({?MXCHANNEL, Key}) end),
@@ -390,10 +394,13 @@ unregister(<<$@, _/binary>> = Key) -> % channel
     case mnesia:dirty_read(?MXPOOL, Key) of
         [] ->
             unknown_pool;
-        [R|_] ->
+        [R] ->
             remove_relations(R#?MXPOOL.related),
             remove_owning(R#?MXPOOL.owners),
-            mnesia:transaction(fun() -> mnesia:delete({?MXPOOL, Key}) end),
+            mnesia:transaction(fun() ->
+                mnesia:delete({?MXPOOL, Key}),
+                mnesia:delete(?MXKV, {rrpool,Key})
+            end),
             ok
     end;
 
@@ -410,7 +417,7 @@ unrelate(Key, From, checked) ->
     case mnesia:dirty_read(?MXRELATION, From) of
         [] ->
             unknown_relation;
-        [Relation|_] ->
+        [Relation] ->
             case lists:member(Key, Relation#?MXRELATION.related) of
                 false ->
                     unknown_relation;
@@ -435,7 +442,7 @@ relate(Key, To, checked) ->
                 key     = To,
                 related = []
             };
-        [Relation|_] ->
+        [Relation] ->
             ok
     end,
     case lists:member(Key, Relation#?MXRELATION.related) of
@@ -453,7 +460,7 @@ remove_relations(Relations) ->
     lists:foldl(
         fun(<<$*,_/binary>> = RelationKey, _) ->
             % client relation
-            [Client|_]      = mnesia:dirty_read(?MXCLIENT, RelationKey),
+            [Client]      = mnesia:dirty_read(?MXCLIENT, RelationKey),
             Related         = lists:delete(RelationKey, Client#?MXCLIENT.related),
             UpdatedClient   = Client#?MXCLIENT{related = Related},
             mnesia:transaction(fun() -> mnesia:write(UpdatedClient) end),
@@ -461,7 +468,7 @@ remove_relations(Relations) ->
 
            (<<$#,_/binary>> = RelationKey, _) ->
            % channel relation
-            [Channel|_]      = mnesia:dirty_read(?MXCHANNEL, RelationKey),
+            [Channel]      = mnesia:dirty_read(?MXCHANNEL, RelationKey),
             Related          = lists:delete(RelationKey, Channel#?MXCHANNEL.related),
             UpdatedChannel   = Channel#?MXCHANNEL{related = Related},
             mnesia:transaction(fun() -> mnesia:write(UpdatedChannel) end),
@@ -469,7 +476,7 @@ remove_relations(Relations) ->
 
             (<<$@,_/binary>> = RelationKey, _) ->
            % pool relation
-            [Channel|_]      = mnesia:dirty_read(?MXCHANNEL, RelationKey),
+            [Channel]      = mnesia:dirty_read(?MXCHANNEL, RelationKey),
             Related          = lists:delete(RelationKey, Channel#?MXCHANNEL.related),
             UpdatedChannel   = Channel#?MXCHANNEL{related = Related},
             mnesia:transaction(fun() -> mnesia:write(UpdatedChannel) end),
@@ -478,7 +485,7 @@ remove_relations(Relations) ->
 
 remove_owning(Owners) ->
     lists:foldl(fun(Key, _) ->
-                [Client|_] = mnesia:dirty_read(?MXCLIENT, Key),
+                [Client] = mnesia:dirty_read(?MXCLIENT, Key),
                 ClientOwnerOf = lists:delete(Key, Client#?MXCLIENT.ownerof),
                 UpdatedClient = Client#?MXCLIENT{ownerof = ClientOwnerOf},
                 mnesia:transaction(fun() -> mnesia:write(UpdatedClient) end),
@@ -493,7 +500,7 @@ abandon(<<$#,_/binary>> = ChannelKey, Client) when is_record(Client, ?MXCLIENT) 
     case mnesia:dirty_read(?MXCHANNEL, ChannelKey) of
         [] ->
             ok;
-        [Channel|_] ->
+        [Channel] ->
             case lists:delete(Client#?MXCLIENT.key, Channel#?MXCHANNEL.owners) of
                 [] ->
                     unregister(ChannelKey);
@@ -508,61 +515,111 @@ dispatch(Q, 0, HasMessages) ->
     {Q, HasMessages};
 dispatch(Q, N, HasMessages) ->
     case mx_queue:get(Q) of
+        % has no message
         {empty, Q1} ->
             {Q1, HasMessages};
+        % async dispatch
         {{value, {_, {To, Message}}}, Q1} when  is_record(To, ?MXCLIENT),
-                                                is_pid(To#?MXCLIENT.handler) ->
-            ?DBG("Dispatch to the client: ~p [MESSAGE: ~p]", [To, Message]),
+                                                is_pid(To#?MXCLIENT.handler),
+                                                To#?MXCLIENT.async ->
+            ?DBG("Dispatch (async) to the client: ~p [MESSAGE: ~p]", [To, Message]),
             To#?MXCLIENT.handler ! Message,
             dispatch(Q1, N - 1, true);
 
+        % sync dispatch
+        {{value, {_, {To, Message}}}, Q1} when  is_record(To, ?MXCLIENT),
+                                                is_pid(To#?MXCLIENT.handler) ->
+            ?DBG("Dispatch to (sync) the client: ~p [MESSAGE: ~p]", [To, Message]),
+            Sync = fun() ->
+                To#?MXCLIENT.handler ! Message,
+                receive
+                    ok -> pass
+                after
+                    ?MX_SEND_TIMEOUT ->
+                        mnesia:transaction(fun() ->
+                            case mnesia:wread({?MXCLIENT, To#?MXCLIENT.key}) of
+                                [] ->
+                                    % unregistered client
+                                    pass;
+                                [Client] ->
+                                    C = Client#?MXCLIENT{handler = offline},
+                                    mnesia:write(C),
+                                    case C#?MXCLIENT.defer of
+                                        true ->
+                                            P = mx_queue:name(Q1),
+                                            defer(P+1, C#?MXCLIENT.key, Message);
+                                        false ->
+                                            pass
+                                    end
+                            end
+                        end)
+                end
+            end,
+            erlang:spawn(Sync),
+            dispatch(Q1, N - 1, true);
+
+        % offline client with deferring
         {{value, {_, {To, Message}}}, Q1} when  is_record(To, ?MXCLIENT),
                                                  To#?MXCLIENT.defer == true ->
             ?DBG("Client is offline: ~p. Defer this message.", [To#?MXCLIENT.name]),
             defer(1, To#?MXCLIENT.key, Message),
             dispatch(Q1, N - 1, true);
 
+        % offline client with disabled deferring (drop messages)
         {{value, {_, {To, _Message}}}, Q1} when  is_record(To, ?MXCLIENT) ->
             ?DBG("Client is offline [~p]. Deferring is disabled. Drop this message.", [To#?MXCLIENT.name]),
             dispatch(Q1, N - 1, true);
 
+        % message for channel
         {{value, {_, {To, Message}}}, Q1} when is_record(To, ?MXCHANNEL) ->
             case mnesia:dirty_read(?MXRELATION, To#?MXCHANNEL.key) of
                 [] ->
-                    pass; % have no recievers
-                [Relations | _] when Relations#?MXRELATION.related == [] ->
-                    pass; % have no recievers
-                [Relations | _] ->
+                    pass; % have no receivers
+                [Relations] when Relations#?MXRELATION.related == [] ->
+                    pass; % have no receivers
+                [Relations] ->
                     ?DBG("Dispatch message to the channel [~p]. Send times [~p] ",
                         [To#?MXCHANNEL.name, length(Relations#?MXRELATION.related)]),
-                    [mx:send(X, Message) || X <- Relations#?MXRELATION.related]
+                    [mx:send(X, Message, [{priority, To#?MXCHANNEL.priority}]) || X <- Relations#?MXRELATION.related]
             end,
             dispatch(Q1, N - 1, true);
 
+        % message for pool
         {{value, {_, {To, Message}}}, Q1} when is_record(To, ?MXPOOL) ->
             case mnesia:dirty_read(?MXRELATION, To#?MXPOOL.key) of
                 [] ->
-                    pass; % have no recievers
-                [Relations|_] when Relations#?MXRELATION.related == [] ->
-                    pass; % have no recievers
-                [Relations|_] when To#?MXPOOL.balance == rr ->
-                    N = 1, % FIXME!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                    X = lists:nth(N, Relations#?MXRELATION.related),
-                    ?DBG("Dispatch message to the pool [~p]. Send to [~p] of [~p] ",
-                        [To#?MXPOOL.name, N, length(Relations#?MXRELATION.related)]),
-                    mx:send(X, Message);
-                [Relations|_] when To#?MXPOOL.balance == random ->
+                    pass; % have no receivers
+                [Relations] when Relations#?MXRELATION.related == [] ->
+                    pass; % have no receivers
+                [Relations] when To#?MXPOOL.balance == rr ->
+                    mnesia:transaction(fun() ->
+                        L = length(Relations#?MXRELATION.related),
+                        case mnesia:wread({?MXKV, {rrpool, To#?MXPOOL.key}}) of
+                            [#?MXKV{value = V}] when V < L ->
+                                I = V + 1;
+                            _ ->
+                                I = 1
+                        end,
+                        KV = #?MXKV{key = {rrpool, To#?MXPOOL.key}, value = I},
+                        mnesia:write(KV),
+                        X = lists:nth(I, Relations#?MXRELATION.related),
+                        ?DBG("Dispatch message to the pool [~p]. Send to [~p] of [~p] ",
+                            [To#?MXPOOL.name, I, length(Relations#?MXRELATION.related)]),
+                        mx:send(X, Message, [{priority, To#?MXPOOL.priority}])
+                    end);
+
+                [Relations] when To#?MXPOOL.balance == random ->
                     N = random:uniform(length(Relations#?MXRELATION.related)),
                     X = lists:nth(N, Relations#?MXRELATION.related),
                     ?DBG("Dispatch message to the pool [~p]. Send to [~p] of [~p] ",
                         [To#?MXPOOL.name, N, length(Relations#?MXRELATION.related)]),
-                    mx:send(X, Message);
-                [Relations|_] when To#?MXPOOL.balance == hash ->
+                    mx:send(X, Message, [{priority, To#?MXPOOL.priority}]);
+                [Relations] when To#?MXPOOL.balance == hash ->
                     N = erlang:phash(Message, length(Relations#?MXRELATION.related)),
                     X = lists:nth(N, Relations#?MXRELATION.related),
                     ?DBG("Dispatch message to the pool [~p]. Send to [~p] of [~p] ",
                         [To#?MXPOOL.name, N, length(Relations#?MXRELATION.related)]),
-                    mx:send(X, Message)
+                    mx:send(X, Message, [{priority, To#?MXPOOL.priority}])
             end,
             dispatch(Q1, N - 1, true);
         {FIXME, Q1} ->
@@ -599,9 +656,10 @@ defer(Priority, To, Message) ->
     Defer = #?MXDEFER{
         to          = To,
         message     = Message,
-        priority    = case Priority =:= 1 of
-                        true -> Priority;
-                        false -> Priority
+        priority    = case Priority of
+                        X when X < 1 -> 1;
+                        X when X > 10 -> 10;
+                        X -> X
                       end
     },
     mnesia:transaction(fun() -> mnesia:write(Defer) end).
