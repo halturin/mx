@@ -1,6 +1,21 @@
-## OTP Message Broker
+# OTP Message Broker
 
-# API
+## Overview
+    Universal OTP messaging broker allows create channels (pub/sub), pools, 
+    mixing it (pool of channels, channel of pools) and even crazy complex messaging
+    (something like: pool of [pool of [...], clients, channels of [...]]). 
+
+    You can set priority for processing (priority range: 1..10). Pool have 3 balance 
+    methods: rr(round robin), hash (by erlang:phash(Message, lenth(Pool))), random.
+
+    Message can be deferred on:
+
+    1) exceed the queue limit (10000) and receiver has the 'true' in 'defer' option.
+
+    2) client has 'offline' state and the 'defer' option is set to 'true'
+
+
+## API
 
 * Create client/channel/pool
       register(client, Name),
@@ -55,12 +70,6 @@
       mx:send(PoolKey, Message)      - pooled unicast message
 
 * Clear deferred messages
-    Message can be deferred on
-    1) exceed the queue limit (10000) and receiver has the 'true'
-    in 'defer' option.
-
-    2) receiver has 'offline' state and the 'defer' option is set to 'true'
-
     mx:flush(Key)
           Key - binary (ClientKey, ChannelKey, PoolKey)
           all - truncate the 'deferred' table
@@ -71,7 +80,7 @@
     ChannelKey = <<$#, ChannelHash/binary>>
     PoolKey    = <<$@, PoolHash/binary>>
 
-# Examples
+## Examples
 
 ```erlang
 
