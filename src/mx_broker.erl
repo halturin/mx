@@ -521,7 +521,7 @@ dispatch(Q, N, HasMessages) ->
         % async dispatch
         {{value, {_, {To, Message}}}, Q1} when  is_record(To, ?MXCLIENT),
                                                 is_pid(To#?MXCLIENT.handler),
-                                                To#?MXCLIENT.async ->
+                                                To#?MXCLIENT.async =:= true ->
             ?DBG("Dispatch (async) to the client: ~p [MESSAGE: ~p]", [To, Message]),
             To#?MXCLIENT.handler ! Message,
             dispatch(Q1, N - 1, true);
