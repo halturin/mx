@@ -69,7 +69,7 @@ start_link() ->
 init([]) ->
     process_flag(trap_exit, true),
 
-    case application:get_env(?MODULE, master) of
+    case application:get_env(mx, master) of
         {ok, Master} when is_atom(Master) ->
             % run as slave
             gen_server:cast(self(), {master, Master});

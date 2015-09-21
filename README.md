@@ -15,6 +15,14 @@
 
     2) client has 'offline' state and the 'defer' option is set to 'true'
 
+    You have to set 'async' option to 'false' value to ensure the message has been delivered.
+
+## Distributed mode
+
+    Set via environment value of 'master'to run it in slave mode.
+```
+    application:set_env(mx, master, 'mxnode01@127.0.0.1')
+```
 
 ## API
 
