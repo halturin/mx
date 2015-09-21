@@ -2,22 +2,21 @@
 
 ## Overview
 
-    Universal OTP message broker allows to create channels (pub/sub), pools,
-    mixing it (pool of channels, channel of pools) and even create crazy complex messaging
-    (something like: pool of [pool of [...], clients, channels of [...]]).
+Universal OTP message broker allows to create channels (pub/sub), pools,
+mixing it (pool of channels, channel of pools) and even create crazy complex messaging
+(something like: pool of [pool of [...], clients, channels of [...]]).
 
-    You can set priority for message processing (range: 1..10).
+You can set priority for message processing (range: 1..10).
 
-    Pool have 3 balance methods: rr(round robin), hash (by erlang:phash(Message, lenth(Pool))), random.
+Pool have 3 balance methods: rr(round robin), hash (by erlang:phash(Message, lenth(Pool))), random.
 
-    Message can be deferred on:
+Message can be deferred on:
 
-    1) exceed the queue limit (10000) and receiver has the 'true' in 'defer' option.
+- exceed the queue limit (10000) and receiver has the 'true' in 'defer' option.
 
-    2) client has 'offline' state and the 'defer' option is set to 'true'
+- client has 'offline' state and the 'defer' option is set to 'true'
 
-    You have to set 'async' Client option to 'false' for delivery control. Default value of
-    this option is 'true'.
+You have to set 'async' Client option to 'false' for delivery control. Default value of this option is 'true'.
 
 ## Distributed mode
 
