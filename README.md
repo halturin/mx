@@ -37,6 +37,7 @@ now you can call mx:nodes() to get list of mx cluster nodes.
 ## API
 
 ### local use
+
 * Create client/channel/pool
 
     **register(client, Name)**  
@@ -99,9 +100,11 @@ now you can call mx:nodes() to get list of mx cluster nodes.
     **mx:nodes()**  
         show MX cluster nodes
 
-### remote use  
-    **gen_server:call(Node, Message)**  
-    *Node*: mx@nodename  
+### remote use
+
+    **gen_server:call(Node, Message)**
+
+    Node: mx@nodename  
     *Message*:  
         -{register_client, Client}
         -{register_client, Client, Opts}
