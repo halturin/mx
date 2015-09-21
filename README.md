@@ -38,71 +38,71 @@ now you can call mx:nodes() to get list of mx cluster nodes.
 
 * Create client/channel/pool
 
-  **register(client, Name)**
-  **register(client, Name, Opts)**
-    Name - list or binary
-    Opts - proplists
-    returns: {clientkey, Key}
+    **register(client, Name)**  
+    **register(client, Name, Opts)**  
+    Name - list or binary  
+    Opts - proplists  
+    returns: {clientkey, Key}  
                    {duplicate, Key}
             Key - binary
 
-    **register(channel, Name, ClientKey)**
-    **register(channel, Name, ClientKey, Opts)**
-          Name - list or binary
-          Opts - proplists
-          ClientKey - binary
-          returns: {channelkey, Key}
+    **register(channel, Name, ClientKey)**  
+    **register(channel, Name, ClientKey, Opts)**  
+          Name - list or binary  
+          Opts - proplists  
+          ClientKey - binary  
+          returns: {channelkey, Key}  
                    {duplicate, Key}
 
-    **register(pool, Name, ClientKey)**
-    **register(pool, Name, ClientKey, Opts)**
-          Name - list or binary
-          Opts - proplists
-          ClientKey - binary
-          returns: {poolkey, Key}
-                   {duplicate, Key}
+    **register(pool, Name, ClientKey)**  
+    **register(pool, Name, ClientKey, Opts)**  
+          Name - list or binary  
+          Opts - proplists  
+          ClientKey - binary  
+          returns: {poolkey, Key}  
+                   {duplicate, Key}  
 
-* Delete client/channel/pool
+* Delete client/channel/pool  
     **unregister(Key)**
 
-* Work with channel/pool
-    **subscribe(Key, Channel)**
-    **unsubscribe(Key, Channel)**
-          Key - binary (ClientKey, ChannelKey, PoolKey)
+* Work with channel/pool  
+    **subscribe(Key, Channel)**  
+    **unsubscribe(Key, Channel)**  
+          Key - binary (ClientKey, ChannelKey, PoolKey)  
           Channel - channel name or channel key
 
-    **join(Key, Pool)**
-    **leave(key, Pool)**
-          Key - binary (ClientKey, ChannelKey, PoolKey)
+    **join(Key, Pool)**  
+    **leave(key, Pool)**  
+          Key - binary (ClientKey, ChannelKey, PoolKey)  
           Pool - pool name or pool key
 
-* Set options for client/channel/pool
-    **set(Key, Opts)**
-          Key - binary (ClientKey, ChannelKey, PoolKey)
+* Set options for client/channel/pool  
+    **set(Key, Opts)**  
+          Key - binary (ClientKey, ChannelKey, PoolKey)  
           Opts - proplists
 
-    **info(Key)**
+    **info(Key)**  
           Key - binary (ClientKey, ChannelKey, PoolKey)
 
-* Sending message
-  **mx:send(ClientKey, Message)**
-  **mx:send(ChannelKey, Message)**
+* Sending message  
+  **mx:send(ClientKey, Message)**  
+  **mx:send(ChannelKey, Message)**  
   **mx:send(PoolKey, Message)**
 
-* Clear deferred messages
-    **mx:flush(Key)**
-        Key - binary (ClientKey, ChannelKey, PoolKey)
+* Clear deferred messages  
+    **mx:flush(Key)**  
+        Key - binary (ClientKey, ChannelKey, PoolKey)  
         all - truncate the 'deferred' table
 
-* Info
-    **mx:nodes()**
+* Info  
+    **mx:nodes()**  
         show MX cluster nodes
 
-* Naming keys
-    prefix + md5(Name)
-    ClientKey  = <<$*, ClientHash/binary>>
-    ChannelKey = <<$#, ChannelHash/binary>>
-    PoolKey    = <<$@, PoolHash/binary>>
+* Naming keys  
+    prefix + md5(Name)  
+    *ClientKey  = <<$*, ClientHash/binary>>*  
+    *ChannelKey = <<$#, ChannelHash/binary>>*  
+    *PoolKey    = <<$@, PoolHash/binary>>*
 
 ## Examples
 
