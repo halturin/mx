@@ -101,9 +101,8 @@ now you can call mx:nodes() to get list of mx cluster nodes.
 
 ### remote use  
     **gen_server:call(Node, Message)**  
-    
-    *Node*: 'mx@nodename'
-    *Message*:
+    *Node*: mx@nodename  
+    *Message*:  
         -{register_client, Client}
         -{register_client, Client, Opts}
         -{register_channel, ChannelName, ClientKey}
