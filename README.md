@@ -26,7 +26,7 @@
     application:start(mx).
 ```
 ```erlang
-    % on mxnode01@127.0.0.1
+    % on mxnode02@127.0.0.1
     application:load(mx),
     application:set_env(mx, master, 'mxnode01@127.0.0.1'),
     application:start(mx).
@@ -37,24 +37,24 @@ now you can call mx:nodes() to get list of mx cluster nodes.
 ## API
 
 * Create client/channel/pool
-      register(client, Name),
-      register(client, Name, Opts),
-          Name - list or binary
-          Opts - proplists
-          returns: {clientkey, Key}
+    **register(client, Name)**
+    **register(client, Name, Opts)**
+        Name - list or binary
+        Opts - proplists
+        returns: {clientkey, Key}
                    {duplicate, Key}
-               Key - binary
+            Key - binary
 
-      register(channel, Name, ClientKey)
-      register(channel, Name, ClientKey, Opts)
+    **register(channel, Name, ClientKey)**
+    **register(channel, Name, ClientKey, Opts)**
           Name - list or binary
           Opts - proplists
           ClientKey - binary
           returns: {channelkey, Key}
                    {duplicate, Key}
 
-      register(pool, Name, ClientKey)
-      register(pool, Name, ClientKey, Opts)
+    **register(pool, Name, ClientKey)**
+    **register(pool, Name, ClientKey, Opts)**
           Name - list or binary
           Opts - proplists
           ClientKey - binary
@@ -62,39 +62,40 @@ now you can call mx:nodes() to get list of mx cluster nodes.
                    {duplicate, Key}
 
 * Delete client/channel/pool
-    unregister(Key)
+    **unregister(Key)**
 
 * Work with channel/pool
-      subscribe(Key, Channel)
-      unsubscribe(Key, Channel)
+    **subscribe(Key, Channel)**
+    **unsubscribe(Key, Channel)**
           Key - binary (ClientKey, ChannelKey, PoolKey)
           Channel - channel name or channel key
 
-      join(Key, Pool)
-      leave(key, Pool)
+    **join(Key, Pool)**
+    **leave(key, Pool)**
           Key - binary (ClientKey, ChannelKey, PoolKey)
           Pool - pool name or pool key
 
 * Set options for client/channel/pool
-      set(Key, Opts)
+    **set(Key, Opts)**
           Key - binary (ClientKey, ChannelKey, PoolKey)
           Opts - proplists
 
-      info(Key)
+    **info(Key)**
           Key - binary (ClientKey, ChannelKey, PoolKey)
 
 * Sending message
-      mx:send(ClientKey, Message)    - unicast message
-      mx:send(ChannelKey, Message)   - muilticast
-      mx:send(PoolKey, Message)      - pooled unicast message
+    **mx:send(ClientKey, Message)**
+    **mx:send(ChannelKey, Message)**
+    **mx:send(PoolKey, Message)**
 
 * Clear deferred messages
-    mx:flush(Key)
-          Key - binary (ClientKey, ChannelKey, PoolKey)
-          all - truncate the 'deferred' table
+    **mx:flush(Key)**
+        Key - binary (ClientKey, ChannelKey, PoolKey)
+        all - truncate the 'deferred' table
 
 * Info
-    mx:nodes()  - show MX cluster nodes
+    **mx:nodes()**
+        show MX cluster nodes
 
 * Naming keys
     prefix + md5(Name)
