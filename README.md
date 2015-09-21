@@ -40,24 +40,24 @@ now you can call mx:nodes() to get list of mx cluster nodes.
 
 * Create client/channel/pool
 
-    **register(client, Name)**  
-    **register(client, Name, Opts)**  
+    **mx:register(client, Name)**  
+    **mx:register(client, Name, Opts)**  
     Name - list or binary  
     Opts - proplists  
     returns: {clientkey, Key}  
                    {duplicate, Key}
             Key - binary
 
-    **register(channel, Name, ClientKey)**  
-    **register(channel, Name, ClientKey, Opts)**  
+    **mx:register(channel, Name, ClientKey)**  
+    **mx:register(channel, Name, ClientKey, Opts)**  
           Name - list or binary  
           Opts - proplists  
           ClientKey - binary  
           returns: {channelkey, Key}  
                    {duplicate, Key}
 
-    **register(pool, Name, ClientKey)**  
-    **register(pool, Name, ClientKey, Opts)**  
+    **mx:register(pool, Name, ClientKey)**  
+    **mx:register(pool, Name, ClientKey, Opts)**  
           Name - list or binary  
           Opts - proplists  
           ClientKey - binary  
@@ -65,25 +65,25 @@ now you can call mx:nodes() to get list of mx cluster nodes.
                    {duplicate, Key}  
 
 * Delete client/channel/pool  
-    **unregister(Key)**
+    **mx:unregister(Key)**
 
 * Work with channel/pool  
-    **subscribe(Key, Channel)**  
-    **unsubscribe(Key, Channel)**  
+    **mx:subscribe(Key, Channel)**  
+    **mx:unsubscribe(Key, Channel)**  
           Key - binary (ClientKey, ChannelKey, PoolKey)  
           Channel - channel name or channel key
 
-    **join(Key, Pool)**  
-    **leave(key, Pool)**  
+    **mx:join(Key, Pool)**  
+    **mx:leave(key, Pool)**  
           Key - binary (ClientKey, ChannelKey, PoolKey)  
           Pool - pool name or pool key
 
 * Set options for client/channel/pool  
-    **set(Key, Opts)**  
+    **mx:set(Key, Opts)**  
           Key - binary (ClientKey, ChannelKey, PoolKey)  
           Opts - proplists
 
-    **info(Key)**  
+    **mx:info(Key)**  
           Key - binary (ClientKey, ChannelKey, PoolKey)
 
 * Sending message  
@@ -102,6 +102,7 @@ now you can call mx:nodes() to get list of mx cluster nodes.
 
 ### remote use
 
+You have to use gen_server call. List of allowed messages is bellow**
     **gen_server:call(Node, Message)**
 
     Node: mx@nodename  
