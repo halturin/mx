@@ -68,15 +68,18 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
     process_flag(trap_exit, true),
-
-    case application:get_env(mx, master) of
-        {ok, Master} when is_atom(Master) ->
-            % run as slave
-            gen_server:cast(self(), {master, Master});
-
-        _ ->
+    case application:get_env(mx, master, none) of
+        none ->
             % run as master
-            gen_server:cast(self(), master)
+            gen_server:cast(self(), master);
+
+        Node when is_atom(Node) ->
+            % run as slave
+            gen_server:cast(self(), {master, Node});
+
+        Node when is_list(Node) ->
+            % run as slave
+            gen_server:cast(self(), {master, list_to_atom(Node)})
     end,
 
     {ok, #state{status = starting}}.

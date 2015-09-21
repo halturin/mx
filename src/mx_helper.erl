@@ -55,9 +55,9 @@ start() ->
     ),
 
     application:load(mx),
-    case init:get_argument(master) of
+    case init:get_argument(mxmaster) of
         {ok, [[MasterNode|_]]} when is_list(MasterNode) ->
-            application:set_env(mx, master, list_to_atom(MasterNode));
+            application:set_env(mx, master, MasterNode);
         _ ->
             pass
     end,

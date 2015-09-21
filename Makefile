@@ -51,5 +51,5 @@ run2: debug
 	@$(ERL) -name mxnode02@127.0.0.1\
                 -pa ebin deps/*/ebin  ../deps/*/ebin ../*/ebin\
                 -s mx_helper\
-                -master mxnode01@127.0.0.1\
+                -mxmaster mxnode01@127.0.0.1\
                 -setcookie devcook -Ddebug=true

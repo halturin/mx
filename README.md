@@ -21,7 +21,9 @@
 
     Set via environment value of 'master'to run it in slave mode.
 ```
-    application:set_env(mx, master, 'mxnode01@127.0.0.1')
+    application:load(mx),
+    application:set_env(mx, master, 'mxnode01@127.0.0.1'),
+    application:start(mx).
 ```
 
 ## API
