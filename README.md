@@ -37,11 +37,11 @@ now you can call mx:nodes() to get list of mx cluster nodes.
 ## API
 
 * Create client/channel/pool
-    **register(client, Name)**
-    **register(client, Name, Opts)**
-        Name - list or binary
-        Opts - proplists
-        returns: {clientkey, Key}
+  **register(client, Name)**
+  **register(client, Name, Opts)**
+    Name - list or binary
+    Opts - proplists
+    returns: {clientkey, Key}
                    {duplicate, Key}
             Key - binary
 
@@ -84,9 +84,9 @@ now you can call mx:nodes() to get list of mx cluster nodes.
           Key - binary (ClientKey, ChannelKey, PoolKey)
 
 * Sending message
-    **mx:send(ClientKey, Message)**
-    **mx:send(ChannelKey, Message)**
-    **mx:send(PoolKey, Message)**
+  **mx:send(ClientKey, Message)**
+  **mx:send(ChannelKey, Message)**
+  **mx:send(PoolKey, Message)**
 
 * Clear deferred messages
     **mx:flush(Key)**
