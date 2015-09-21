@@ -20,16 +20,16 @@ You have to set 'async' Client option to 'false' for delivery control. Default v
 
 ## Distributed mode
 
-    Set via environment value of 'master'to run it in slave mode.
+Set via environment value of 'master'to run it in slave mode.
 ```erlang
-    % on mxnode01@127.0.0.1
-    application:start(mx).
+% on mxnode01@127.0.0.1
+application:start(mx).
 ```
 ```erlang
-    % on mxnode02@127.0.0.1
-    application:load(mx),
-    application:set_env(mx, master, 'mxnode01@127.0.0.1'),
-    application:start(mx).
+% on mxnode02@127.0.0.1
+application:load(mx),
+application:set_env(mx, master, 'mxnode01@127.0.0.1'),
+application:start(mx).
 ```
 
 now you can call mx:nodes() to get list of mx cluster nodes.
