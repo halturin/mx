@@ -23,7 +23,7 @@
 
 -behaviour(gen_server).
 
--compile({no_auto_import,[register/2, nodes/0]}).
+-compile({no_auto_import,[register/2, nodes/0, monitor_node/2]}).
 
 -export([start_link/0]).
 
@@ -58,7 +58,14 @@
 -include_lib("include/mx.hrl").
 
 register(client, Client, Opts) when is_binary(Client) ->
-    call({register_client, Client, Opts});
+    case call({register_client, Client, Opts}) of
+        {clientkey, ClientKey} ->
+            Node = proplists:get_value(Opts, handler, self()),
+            monitor_node(erlang:node(Node), ClientKey);
+        E ->
+            E
+    end;
+
 register(X, Y, Opts) when is_list(Y) ->
     register(X, list_to_binary(Y), Opts);
 
@@ -219,6 +226,10 @@ init([]) ->
     process_flag(trap_exit, true),
     ok = wait_for_mnesia(5000), % wait for mnesia 5 sec
     erlang:send_after(0, self(), {'$gen_cast', requeue}),
+
+    % handle monitoring remote nodes by mx
+    mnesia:subscribe(system),
+
     {ok, #state{config = []}}.
 
 %%--------------------------------------------------------------------
@@ -235,11 +246,18 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({register_client, Client, Opts}, _From, State) ->
-    R = register(client, Client, Opts),
+handle_call({register_client, Client, Opts}, {Pid, _}, State) ->
+    case proplists:is_defined(handler, Opts) of
+        true ->
+            R = register(client, Client, Opts);
+        false ->
+            Opts1 = proplists:append_values({handler, Pid}, Opts),
+            R = register(client, Client, Opts1)
+    end,
     {reply, R, State};
-handle_call({register_client, Client}, _From, State) ->
-    R = register(client, Client),
+
+handle_call({register_client, Client}, {Pid, _}, State) ->
+    R = register(client, Client, [{handler, Pid}]),
     {reply, R, State};
 
 handle_call({register_channel, ChannelName, ClientKey, Opts}, _From, State) ->
@@ -328,6 +346,20 @@ handle_cast(Message, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info({mnesia_system_event,{mnesia_down,Node}}, State) ->
+
+    ?FIXME("Set offline state for all monitored ClientKeys by MX node ~p", [Node]),
+
+    % update mx node list
+    {noreply, State};
+
+
+handle_info({mnesia_system_event, _}, State) ->
+    {noreply, State};
+
+handle_info({nodedown, Node}, State) ->
+    demonitor_node(Node),
+    {noreply, State};
 
 handle_info(Info, State) ->
     ?ERR("unhandled info: ~p", [Info]),
@@ -422,3 +454,11 @@ requeue() ->
     % еще надо учесть загруженность очередей, ежели они в перегрузке (>high_threshold) то пропускать.
     % lists:map(fun(M) ->
     % mnesia:wread({?MXDEFER, })
+
+monitor_node(Node, ClientKey) ->
+    erlang:monitor_node(Node, true),
+    ok.
+
+demonitor_node(Node) ->
+    erlang:monitor_node(Node, false),
+    ok.

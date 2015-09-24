@@ -41,4 +41,8 @@
 
 -define(LOG_STACK,                  ?LOG("Stack: ~p", [try throw(42) catch 42 -> erlang:get_stacktrace() end])).
 
+-define(FIXME,                      lager:log(emergency, self(), "FIXME[at ~p:~p]!!!", [?MODULE, ?LINE])).
+-define(FIXME(Format),              lager:log(emergency, self(), "FIXME[at ~p:~p]: " ++ Format ++ "!!!", [?MODULE, ?LINE])).
+-define(FIXME(Format, Data),        lager:log(emergency, self(), "FIXME[at ~p:~p]: " ++ Format ++ "!!!", [?MODULE, ?LINE | Data])).
+
 -endif.

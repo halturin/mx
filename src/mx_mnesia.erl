@@ -130,8 +130,10 @@ handle_cast(master, State) ->
             ?ERR("failed to create Mnesia schema: ~p", [E])
     end,
     ok = mnesia:start(),
+
     [create_table(T,A) || {T,A} <- ?MXTABLES],
     mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
+
     {noreply, State#state{status = running}};
 
 
@@ -140,6 +142,7 @@ handle_cast({master, Master}, State) ->
     ok = stop(),
     ok = mnesia:delete_schema([node()]),
     ok = mnesia:start(),
+
     case mnesia:change_config(extra_db_nodes, [Master]) of
         [] ->
             throw({error, "failed to start Mnesia in slave mode"});
@@ -148,9 +151,9 @@ handle_cast({master, Master}, State) ->
             ?DBG("Mnesia cluster: ~p", [Cluster]),
             ok
     end,
+
     [copy_table(T) || T <- ?MXTABLES],
     mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
-
 
     {noreply, State#state{status = running}};
 
