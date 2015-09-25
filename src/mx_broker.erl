@@ -125,6 +125,9 @@ handle_call({register_client, Client, Opts}, {Pid, _}, State) ->
             case mnesia:transaction(fun() -> mnesia:write(C) end) of
                 {aborted, E} ->
                     {reply, E, State};
+                _ when C#?MXCLIENT.monitor =:= true ->
+                    mx:send(?MXSYSTEM_CLIENTS_CHANNEL, {online, Client}),
+                    {reply, {clientkey, ClientKey}, State};
                 _ ->
                     {reply, {clientkey, ClientKey}, State}
             end;
@@ -245,6 +248,26 @@ handle_call({unregister, Key}, _From, State) ->
     R = unregister(Key),
     {reply, R, State};
 
+handle_call({set, <<$*, _/binary>> = ClientKey, Opts}, _From, State) ->
+    case mnesia:dirty_read(?MXCLIENT, ClientKey) of
+        [] ->
+            {reply, unknown_client, State};
+        [Client] ->
+            Client1 = Client#?MXCLIENT{
+                handler = proplists:get_value(handler, Opts, Client#?MXCLIENT.handler),
+                async   = proplists:get_value(async, Opts, Client#?MXCLIENT.async),
+                defer   = proplists:get_value(defer, Opts, Client#?MXCLIENT.defer),
+                monitor = proplists:get_value(monitor, Opts, Client#?MXCLIENT.monitor)
+            },
+            mnesia:transaction(fun() -> mnesia:write(Client1) end),
+            {reply, ok, State}
+    end;
+
+handle_call({set, <<$#, _/binary>> = ChannelKey, Opts}, _From, State) ->
+    {reply, ok, State};
+
+handle_call({set, <<$@, _/binary>> = PoolKey, Opts}, _From, State) ->
+    {reply, ok, State};
 
 handle_call(Request, _From, State) ->
     ?ERR("unhandled call: ~p", [Request]),
@@ -324,10 +347,6 @@ handle_cast({offline, ClientKey}, State) ->
     client_offline(ClientKey),
     {noreply, State};
 
-handle_cast({online, ClientKey}, State) ->
-    client_online(ClientKey),
-    {noreply, State};
-
 handle_cast(Msg, State) ->
     ?ERR("unhandled cast: ~p", [Msg]),
     {noreply, State}.
@@ -381,7 +400,13 @@ unregister(<<$*,_/binary>> = ClientKey) ->
         case mnesia:dirty_read(?MXCLIENT, ClientKey) of
         [] ->
             unknown_client;
-        [Client] ->
+        [Client] when Client#?MXCLIENT.monitor =:= true ->
+            [unrelate(ClientKey, Ch) || Ch <- Client#?MXCLIENT.related],
+            [abandon(I, Client) || I <- Client#?MXCLIENT.ownerof],
+            mnesia:transaction(fun() -> mnesia:delete({?MXCLIENT, ClientKey}) end),
+            mx:send(?MXSYSTEM_CLIENTS_CHANNEL, {offline, Client}),
+            ok;
+        [Client] when Client#?MXCLIENT.monitor =:= true ->
             [unrelate(ClientKey, Ch) || Ch <- Client#?MXCLIENT.related],
             [abandon(I, Client) || I <- Client#?MXCLIENT.ownerof],
             mnesia:transaction(fun() -> mnesia:delete({?MXCLIENT, ClientKey}) end),
@@ -654,13 +679,13 @@ dispatch(QueuesTable) ->
 
 defer(Priority, To, Message) ->
     Defer = #?MXDEFER{
-        to          = To,
-        message     = Message,
         priority    = case Priority of
                         X when X < 1 -> 1;
                         X when X > 10 -> 10;
                         X -> X
-                      end
+                      end,
+        to          = To,
+        message     = Message
     },
     mnesia:transaction(fun() -> mnesia:write(Defer) end).
 
@@ -766,18 +791,3 @@ client_offline(<<$*, _/binary>> = ClientKey) ->
         end
     end).
 
-client_online(<<$*, _/binary>> = ClientKey) ->
-    mnesia:transaction(fun() ->
-        case mnesia:wread({?MXCLIENT, ClientKey}) of
-            [] ->
-                % unregistered client
-                pass;
-            [Client] when Client#?MXCLIENT.monitor =:= true ->
-                mx:send(?MXSYSTEM_CLIENTS_CHANNEL, {online, Client#?MXCLIENT.name}),
-                C = Client#?MXCLIENT{handler = online},
-                mnesia:write(C);
-            [Client] when Client#?MXCLIENT.monitor =:= false ->
-                C = Client#?MXCLIENT{handler = online},
-                mnesia:write(C)
-        end
-    end).

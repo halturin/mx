@@ -116,9 +116,9 @@
     }).
 
 -record(?MXDEFER, {
+    priority    :: non_neg_integer(),
     to          :: binary(),
     message,
-    priority    :: non_neg_integer(),
     fails       = 0 :: non_neg_integer()    % count of sending fails
     }).
 

@@ -453,21 +453,30 @@ cast(M) ->
 requeue(_, 0, HasDeferred) ->
     HasDeferred;
 requeue(P, N, HasDeferred) ->
-    % case mnesia:wread({?MXDEFER, }) of
-    % end,
-    % send(To, Message, [{priority, P}]),
+    % ?FIXME("we have to check queue utilization here"),
+    case
+        mnesia:transaction(fun() ->
+            case mnesia:read(?MXDEFER, N, read) of
+                [] ->
+                    pass;
+                [Deferred|_] ->
+                    mnesia:delete_object(?MXDEFER, Deferred, write),
+                    Deferred
+            end
+        end) of
 
-    % mx_queue:len(Q)
-    requeue(P, N - 1, HasDeferred).
+        {atomic, M} when is_record(M, ?MXDEFER) ->
+            send(M#?MXDEFER.to,
+                 M#?MXDEFER.message,
+                 [{priority, M#?MXDEFER.priority}]),
+            requeue(P, N - 1, true);
+
+        {atomic,pass} ->
+            requeue(P, 0, false)
+    end.
 
 
 requeue() ->
-    % модель такая же как и выборка из очереди. выгребаем 10 штук 1го приоритета... 1 шт 10го.
-    % если еще есть данные, то возвращаем 0 для таймера cast.
-    % еще надо учесть загруженность очередей, ежели они в перегрузке (>high_threshold) то пропускать.
-    % lists:map(fun(M) ->
-    % mnesia:wread({?MXDEFER, })
-
         case    lists:foldl(fun(P, HasDeferredAcc) ->
                     case requeue(P, 11 - P, false) of
                         true  ->
