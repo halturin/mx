@@ -453,7 +453,7 @@ cast(M) ->
 requeue(_, 0, HasDeferred) ->
     HasDeferred;
 requeue(P, N, HasDeferred) ->
-    % ?FIXME("we have to check queue utilization here"),
+    % ?FIXME("we have to check queue utilization here - do not requeue if its exceed the 'threshold_high' limit"),
     case
         mnesia:transaction(fun() ->
             case mnesia:read(?MXDEFER, N, read) of
@@ -465,13 +465,12 @@ requeue(P, N, HasDeferred) ->
             end
         end) of
 
-        {atomic, M} when is_record(M, ?MXDEFER) ->
-            send(M#?MXDEFER.to,
-                 M#?MXDEFER.message,
-                 [{priority, M#?MXDEFER.priority}]),
+        {atomic, Deferred} when is_record(Deferred, ?MXDEFER) ->
+            #?MXDEFER{to = To, message = M, priority = P} = Deferred,
+            send(To, M, [{priority, P}]),
             requeue(P, N - 1, true);
 
-        {atomic,pass} ->
+        {atomic, pass} ->
             requeue(P, 0, false)
     end.
 
