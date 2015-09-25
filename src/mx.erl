@@ -471,7 +471,7 @@ requeue(P, N, HasDeferred) ->
             requeue(P, N - 1, true);
 
         {atomic, pass} ->
-            requeue(P, 0, false)
+            requeue(P, 0, HasDeferred)
     end.
 
 
