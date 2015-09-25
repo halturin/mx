@@ -39,6 +39,11 @@
 -define(MXRELATION,                 mx_table_relation).
 -define(MXKV,                       mx_table_kv).
 
+-define(MXSYSTEM_CHANNEL,           <<35,1,205,204,237,249,21,234,116,63,125,148,219,82,19,237,212>>).
+-define(MXSYSTEM_CLIENTS_CHANNEL,   <<35,218,100,92,158,250,171,65,140,165,196,6,41,174,67,121,214>>).
+-define(MXSYSTEM_QUEUES_CHANNEL,    <<35,44,214,227,18,198,49,63,136,180,212,33,133,149,223,21,136>>).
+
+
 -define(MX_SEND_TIMEOUT,            5000). % sync sending timeout
 
 -define(MXTABLES,
@@ -80,6 +85,7 @@
     handler     :: pid() | offline,   % who manage the client (for recieving messages)
     async       = true :: boolean(),  % send async or wait for 'ok' message
     defer       = false :: boolean(), % defer message when the handler is not available (offline)
+    monitor     = false :: boolean(), % generate 'on/off' event message to the $system/$clients channel if its 'true'
     comment     = "Client info" :: list()
     }).
 

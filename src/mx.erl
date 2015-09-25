@@ -60,8 +60,9 @@
 register(client, Client, Opts) when is_binary(Client) ->
     case call({register_client, Client, Opts}) of
         {clientkey, ClientKey} ->
-            Node = proplists:get_value(Opts, handler, self()),
-            monitor_node(erlang:node(Node), ClientKey);
+            Node            = proplists:get_value(handler, Opts, self()),
+            monitor_node(erlang:node(Node), ClientKey),
+            {clientkey, ClientKey};
         E ->
             E
     end;
@@ -230,6 +231,8 @@ init([]) ->
     % handle monitoring remote nodes by mx
     mnesia:subscribe(system),
 
+    init_mxscheme(),
+
     {ok, #state{config = []}}.
 
 %%--------------------------------------------------------------------
@@ -348,6 +351,21 @@ handle_cast(Message, State) ->
 %%--------------------------------------------------------------------
 handle_info({mnesia_system_event,{mnesia_down,Node}}, State) ->
 
+    % mnesia:transaction(fun() ->
+    %     case mnesia:read(?MXKV, Node, read) of
+    %         [] ->
+    %             % unregistered client
+    %             pass;
+    %         [Client] when Client#?MXCLIENT.monitor =:= true ->
+    %             mx:send(?MXSYSTEM_CLIENTS_CHANNEL, {offline, Client#?MXCLIENT.name}),
+    %             C = Client#?MXCLIENT{handler = offline},
+    %             mnesia:write(C);
+    %         [Client] when Client#?MXCLIENT.monitor =:= false ->
+    %             C = Client#?MXCLIENT{handler = offline},
+    %             mnesia:write(C)
+    %     end
+    % end
+
     ?FIXME("Set offline state for all monitored ClientKeys by MX node ~p", [Node]),
 
     % update mx node list
@@ -406,6 +424,16 @@ wait_for_mnesia(T) when T > 0 ->
 wait_for_mnesia(_T) ->
     timeout.
 
+init_mxscheme() ->
+    {_, RootKey}        = register(client, "%root"),
+    {_, SystemChannel}  = register(channel, "%system", RootKey, [{priority, 1}]),
+    {_, SystemClientsChannel}   = register(channel, "%clients", RootKey, [{priority, 1}]),
+    {_, SystemQueuesChannel}    = register(channel, "%queues",  RootKey, [{priority, 1}]),
+    subscribe(SystemClientsChannel, SystemChannel),
+    subscribe(SystemQueuesChannel,  SystemChannel),
+    ok.
+
+
 call(M) ->
     case gproc_pool:pick_worker(mx_pubsub) of
         false ->
@@ -434,6 +462,12 @@ requeue(P, N, HasDeferred) ->
 
 
 requeue() ->
+    % модель такая же как и выборка из очереди. выгребаем 10 штук 1го приоритета... 1 шт 10го.
+    % если еще есть данные, то возвращаем 0 для таймера cast.
+    % еще надо учесть загруженность очередей, ежели они в перегрузке (>high_threshold) то пропускать.
+    % lists:map(fun(M) ->
+    % mnesia:wread({?MXDEFER, })
+
         case    lists:foldl(fun(P, HasDeferredAcc) ->
                     case requeue(P, 11 - P, false) of
                         true  ->
@@ -449,16 +483,33 @@ requeue() ->
     end.
 
 
-    % модель такая же как и выборка из очереди. выгребаем 10 штук 1го приоритета... 1 шт 10го.
-    % если еще есть данные, то возвращаем 0 для таймера cast.
-    % еще надо учесть загруженность очередей, ежели они в перегрузке (>high_threshold) то пропускать.
-    % lists:map(fun(M) ->
-    % mnesia:wread({?MXDEFER, })
-
 monitor_node(Node, ClientKey) ->
-    erlang:monitor_node(Node, true),
-    ok.
+    mnesia:transaction(fun() ->
+        case mnesia:read(?MXKV, {monitor, erlang:node(), Node}, read) of
+            [] ->
+                erlang:monitor_node(Node, true),
+                KV = #?MXKV{key = {monitor, erlang:node(), Node}, value = [ClientKey]},
+                mnesia:write(KV);
+            [#?MXKV{key = K, value = V}] ->
+                case lists:member(ClientKey, V) of
+                    false ->
+                        mnesia:write(#?MXKV{key = K, value = [ClientKey | V]});
+                    true ->
+                        pass
+                end
+        end
+    end).
 
 demonitor_node(Node) ->
-    erlang:monitor_node(Node, false),
-    ok.
+    mnesia:transaction(fun() ->
+        case mnesia:read(?MXKV, {monitor, erlang:node(), Node}, read) of
+            [] ->
+                erlang:monitor_node(Node, false);
+            [#?MXKV{key = K, value = V}] ->
+                mnesia:transaction(fun() -> mnesia:delete({?MXKV, K}) end),
+                % set client handle to 'offline'
+                [cast({offline, C}) || C <- V],
+                erlang:monitor_node(Node, false)
+        end
+    end).
+
