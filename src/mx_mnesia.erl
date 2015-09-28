@@ -252,7 +252,7 @@ clear_table_kv(_,_) ->
     pass.
 
 clear_table_kv() ->
-    case mnesia:all_keys(?MXKV) of
+    case mnesia:dirty_all_keys(?MXKV) of
         [] ->
             pass;
         Keys ->
