@@ -254,7 +254,7 @@ handle_call({register_client, Client, Opts}, {Pid, _}, State) ->
         true ->
             R = register(client, Client, Opts);
         false ->
-            Opts1 = proplists:append_values({handler, Pid}, Opts),
+            Opts1 = [{handler, Pid} | Opts],
             R = register(client, Client, Opts1)
     end,
     {reply, R, State};
@@ -495,10 +495,12 @@ monitor_node(Node, ClientKey) ->
     mnesia:transaction(fun() ->
         case mnesia:read(?MXKV, {monitor, erlang:node(), Node}, read) of
             [] ->
+                ?DBG("monitor node ~p", [Node]),
                 erlang:monitor_node(Node, true),
                 KV = #?MXKV{key = {monitor, erlang:node(), Node}, value = [ClientKey]},
                 mnesia:write(KV);
             [#?MXKV{key = K, value = V}] ->
+                ?DBG("monitor node: already"),
                 case lists:member(ClientKey, V) of
                     false ->
                         mnesia:write(#?MXKV{key = K, value = [ClientKey | V]});
@@ -509,15 +511,23 @@ monitor_node(Node, ClientKey) ->
     end).
 
 demonitor_node(Node) ->
-    mnesia:transaction(fun() ->
-        case mnesia:read(?MXKV, {monitor, erlang:node(), Node}, read) of
-            [] ->
-                erlang:monitor_node(Node, false);
-            [#?MXKV{key = K, value = V}] ->
-                mnesia:transaction(fun() -> mnesia:delete({?MXKV, K}) end),
-                % set client handle to 'offline'
-                [cast({offline, C}) || C <- V],
-                erlang:monitor_node(Node, false)
-        end
-    end).
-
+    case mnesia:transaction(fun() ->
+            case mnesia:read(?MXKV, {monitor, erlang:node(), Node}, read) of
+                [] ->
+                    erlang:monitor_node(Node, false),
+                    [];
+                [#?MXKV{key = K, value = V}] ->
+                    ?DBG("Demonitor node (~p): set offline - ~p", [Node,V]),
+                    mnesia:transaction(fun() -> mnesia:delete({?MXKV, K}) end),
+                    erlang:monitor_node(Node, false),
+                    V
+            end
+         end) of
+        {atomic, []} ->
+            pass;
+        {atomic, ClientKeys} ->
+            % set client handle to 'offline'
+            [cast({offline, C}) || C <- ClientKeys];
+        _ ->
+            pass
+    end.

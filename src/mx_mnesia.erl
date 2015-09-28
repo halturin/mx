@@ -134,6 +134,8 @@ handle_cast(master, State) ->
     [create_table(T,A) || {T,A} <- ?MXTABLES],
     mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
 
+    clear_table_kv(),
+
     {noreply, State#state{status = running}};
 
 
@@ -154,6 +156,8 @@ handle_cast({master, Master}, State) ->
 
     [copy_table(T) || T <- ?MXTABLES],
     mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
+
+    clear_table_kv(),
 
     {noreply, State#state{status = running}};
 
@@ -239,4 +243,18 @@ copy_table(T) ->
         {atomic, ok}                        -> ok;
         {aborted, {already_exists, _, _}}   -> ok;
         Error                               -> Error
+    end.
+
+
+clear_table_kv(Node, {monitor, Node, _} = KV) ->
+    mnesia:transaction(fun() -> mnesia:delete({?MXKV, KV}) end);
+clear_table_kv(_,_) ->
+    pass.
+
+clear_table_kv() ->
+    case mnesia:all_keys(?MXKV) of
+        [] ->
+            pass;
+        Keys ->
+            [clear_table_kv(node(), KV) || KV <- Keys]
     end.

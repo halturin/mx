@@ -212,12 +212,12 @@ handle_call({register_pool, Pool, ClientKey, Opts}, _From, State) ->
     end;
 
 handle_call({info, <<$*,_/binary>> = ClientKey}, _From, State) ->
-    ?LOG("Broker:~p", [State#state.id]),
     case mnesia:dirty_read(?MXCLIENT, ClientKey) of
         [] ->
             {reply, unknown_client, State};
         [Client] ->
-            {reply, Client, State}
+            R = lists:zip(record_info(fields, ?MXCLIENT), tl(tuple_to_list(Client))),
+            {reply, R, State}
     end;
 
 handle_call({info, <<$#, _/binary>> = ChannelKey}, _From, State) ->
@@ -225,7 +225,8 @@ handle_call({info, <<$#, _/binary>> = ChannelKey}, _From, State) ->
         [] ->
             {reply, unknown_channel, State};
         [Channel] ->
-            {reply, Channel, State}
+            R = lists:zip(record_info(fields, ?MXCHANNEL), tl(tuple_to_list(Channel))),
+            {reply, R, State}
     end;
 
 handle_call({info, <<$@, _/binary>> = PoolKey}, _From, State) ->
@@ -233,7 +234,8 @@ handle_call({info, <<$@, _/binary>> = PoolKey}, _From, State) ->
         [] ->
             {reply, unknown_pool, State};
         [Pool] ->
-            {reply, Pool, State}
+            R = lists:zip(record_info(fields, ?MXPOOL), tl(tuple_to_list(Pool))),
+            {reply, R, State}
     end;
 
 handle_call({relate, Key, To}, _From, State) ->
@@ -257,9 +259,39 @@ handle_call({set, <<$*, _/binary>> = ClientKey, Opts}, _From, State) ->
                 handler = proplists:get_value(handler, Opts, Client#?MXCLIENT.handler),
                 async   = proplists:get_value(async, Opts, Client#?MXCLIENT.async),
                 defer   = proplists:get_value(defer, Opts, Client#?MXCLIENT.defer),
-                monitor = proplists:get_value(monitor, Opts, Client#?MXCLIENT.monitor)
+                monitor = proplists:get_value(monitor, Opts, Client#?MXCLIENT.monitor),
+                comment = proplists:get_value(comment, Opts, Client#?MXCLIENT.comment)
             },
             mnesia:transaction(fun() -> mnesia:write(Client1) end),
+            {reply, ok, State}
+    end;
+
+handle_call({set, <<$#, _/binary>> = ChannelKey, Opts}, _From, State) ->
+    case mnesia:dirty_read(?MXCHANNEL, ChannelKey) of
+        [] ->
+            {reply, unknown_channel, State};
+        [Channel] ->
+            Channel1 = Channel#?MXCHANNEL{
+                defer    = proplists:get_value(defer, Opts, Channel#?MXCHANNEL.defer),
+                priority = proplists:get_value(priority, Opts, Channel#?MXCHANNEL.priority),
+                comment  = proplists:get_value(comment, Opts, Channel#?MXCHANNEL.comment)
+            },
+            mnesia:transaction(fun() -> mnesia:write(Channel1) end),
+            {reply, ok, State}
+    end;
+
+handle_call({set, <<$@, _/binary>> = PoolKey, Opts}, _From, State) ->
+    case mnesia:dirty_read(?MXPOOL, PoolKey) of
+        [] ->
+            {reply, unknown_pool, State};
+        [Pool] ->
+            Pool1 = Pool#?MXPOOL{
+                balance  = proplists:get_value(balance, Opts, Pool#?MXPOOL.balance),
+                defer    = proplists:get_value(defer, Opts, Pool#?MXPOOL.defer),
+                priority = proplists:get_value(priority, Opts, Pool#?MXPOOL.priority),
+                comment  = proplists:get_value(comment, Opts, Pool#?MXPOOL.comment)
+            },
+            mnesia:transaction(fun() -> mnesia:write(Pool1) end),
             {reply, ok, State}
     end;
 
@@ -527,8 +559,19 @@ remove_owning(Owners) ->
             end, ok, Owners).
 
 abandon(<<$@,_/binary>> = PoolKey, Client) when is_record(Client, ?MXCLIENT) ->
-    ?ERR("unimplemented abandon pool function"),
-    ok;
+    case mnesia:dirty_read(?MXPOOL, PoolKey) of
+        [] ->
+            ok;
+        [Pool] ->
+            case lists:delete(Client#?MXCLIENT.key, Pool#?MXPOOL.owners) of
+                [] ->
+                    unregister(PoolKey);
+                Owners ->
+                    UpdatedPool = Pool#?MXPOOL{owners = Owners},
+                    mnesia:transaction(fun() ->mnesia:write(UpdatedPool) end),
+                    ok
+            end
+    end;
 
 abandon(<<$#,_/binary>> = ChannelKey, Client) when is_record(Client, ?MXCLIENT) ->
     case mnesia:dirty_read(?MXCHANNEL, ChannelKey) of
