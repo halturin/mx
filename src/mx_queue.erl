@@ -108,7 +108,7 @@ alarm() ->
 alarm(State) ->
     fun(Alarm, _) when Alarm =:= State -> alarm(State);
        (Alarm, _Q) when Alarm =/= State ->
-            ?LOG("Warinig: ~p -> ~p", [State, Alarm]),
+            % ?LOG("Warinig: ~p -> ~p", [State, Alarm]),
             alarm(Alarm)
     end.
 

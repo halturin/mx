@@ -466,8 +466,8 @@ requeue(P, N, HasDeferred) ->
         end) of
 
         {atomic, Deferred} when is_record(Deferred, ?MXDEFER) ->
-            #?MXDEFER{to = To, message = M, priority = P} = Deferred,
-            send(To, M, [{priority, P}]),
+            #?MXDEFER{to = To, message = Message, priority = Priority} = Deferred,
+            send(To, Message, [{priority, Priority}]),
             requeue(P, N - 1, true);
 
         {atomic, pass} ->

@@ -46,6 +46,13 @@ run: debug
                 -pa ebin deps/*/ebin  ../deps/*/ebin ../*/ebin\
                 -s mx_helper\
                 -setcookie devcook -Ddebug=true
+
+runnodeb: clean compile
+	@echo "[ Run (debug mode)... ]"
+	@$(ERL) -name mxnode01@127.0.0.1\
+                -pa ebin deps/*/ebin  ../deps/*/ebin ../*/ebin\
+                -s mx_helper\
+                -setcookie devcook
 run2: debug
 	@echo "[ Run (debug mode)... ]"
 	@$(ERL) -name mxnode02@127.0.0.1\

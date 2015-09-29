@@ -23,7 +23,7 @@
 -define(MX_HRL, true).
 
 % queue limits
--define(MXQUEUE_LENGTH_LIMIT,       10).
+-define(MXQUEUE_LENGTH_LIMIT,       10000).
 -define(MXQUEUE_LOW_THRESHOLD,      trunc(?MXQUEUE_LENGTH_LIMIT * 0.6)). % 60%
 -define(MXQUEUE_HIGH_THRESHOLD,     trunc(?MXQUEUE_LENGTH_LIMIT * 0.8)). % 80%
 
