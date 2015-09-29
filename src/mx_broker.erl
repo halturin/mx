@@ -600,7 +600,7 @@ dispatch(Q, N, HasMessages) ->
                                                 is_pid(To#?MXCLIENT.handler),
                                                 To#?MXCLIENT.async =:= true ->
             ?DBG("Dispatch (async) to the client: ~p [MESSAGE: ~p]", [To, Message]),
-            To#?MXCLIENT.handler ! Message,
+            To#?MXCLIENT.handler ! {mx, Message},
             dispatch(Q1, N - 1, true);
 
         % sync dispatch
@@ -608,7 +608,7 @@ dispatch(Q, N, HasMessages) ->
                                                 is_pid(To#?MXCLIENT.handler) ->
             ?DBG("Dispatch to (sync) the client: ~p [MESSAGE: ~p]", [To, Message]),
             Sync = fun() ->
-                To#?MXCLIENT.handler ! Message,
+                To#?MXCLIENT.handler ! {mxs, self(), Message},
                 receive
                     ok -> pass
                 after
