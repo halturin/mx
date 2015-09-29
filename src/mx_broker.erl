@@ -438,7 +438,7 @@ unregister(<<$*,_/binary>> = ClientKey) ->
             mnesia:transaction(fun() -> mnesia:delete({?MXCLIENT, ClientKey}) end),
             mx:send(?MXSYSTEM_CLIENTS_CHANNEL, {offline, Client}),
             ok;
-        [Client] when Client#?MXCLIENT.monitor =:= true ->
+        [Client] ->
             [unrelate(ClientKey, Ch) || Ch <- Client#?MXCLIENT.related],
             [abandon(I, Client) || I <- Client#?MXCLIENT.ownerof],
             mnesia:transaction(fun() -> mnesia:delete({?MXCLIENT, ClientKey}) end),
