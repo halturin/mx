@@ -91,6 +91,14 @@ now you can call mx:nodes() to get the list of mx cluster nodes.
   **mx:send(ChannelKey, Message)**  
   **mx:send(PoolKey, Message)**
 
+* Owning Pool/Channel  
+  **mx:own(Key, ClientKey)**  
+          Key - binary (ChannelKey, PoolKey)
+
+  **mx:abandon(Key, ClientKey)**  
+          Key - binary (ChannelKey, PoolKey)  
+          orphan Pool/Channel will unregister automaticaly
+
 * Clear deferred messages  
     **mx:flush(Key)**  
         Key - binary (ClientKey, ChannelKey, PoolKey)  
@@ -116,6 +124,8 @@ You have to use **gen_server:call(MX, Message)**, where
 - {join, Client, To}
 - {leave, Client, From}
 - {send, To, Message}
+- {own, Key, ClientKey}
+- {abandon, Key, ClientKey}
 - {info, Key}
 - {set, Key, Opts}
 - nodes
