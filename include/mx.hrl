@@ -39,8 +39,11 @@
 -define(MXRELATION,                 mx_table_relation).
 -define(MXKV,                       mx_table_kv).
 
+% '$system'
 -define(MXSYSTEM_CHANNEL,           <<35,1,205,204,237,249,21,234,116,63,125,148,219,82,19,237,212>>).
+% '$clients'
 -define(MXSYSTEM_CLIENTS_CHANNEL,   <<35,218,100,92,158,250,171,65,140,165,196,6,41,174,67,121,214>>).
+% '$queues'
 -define(MXSYSTEM_QUEUES_CHANNEL,    <<35,44,214,227,18,198,49,63,136,180,212,33,133,149,223,21,136>>).
 
 
@@ -119,6 +122,7 @@
     priority    :: non_neg_integer(),
     to          :: binary(),
     message,
+    parent      = none,
     fails       = 0 :: non_neg_integer()    % count of sending fails
     }).
 

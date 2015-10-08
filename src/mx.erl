@@ -46,6 +46,8 @@
          send/3,
          info/1,
          set/2,
+         own/2,
+         abandon/2,
          flush/1,
          nodes/0
         ]).
@@ -190,6 +192,23 @@ send(<<$@, _/binary>> = PoolKeyTo, Message, Opts) ->
 send(_, _, _) ->
     unknown_receiver.
 
+own(Key, <<$*, _/binary>> = ClientKey) ->
+    case mnesia:dirty_read(?MXCLIENT, ClientKey) of
+        [] ->
+            unknown_client;
+        [Client] ->
+            call({own, Key, Client})
+    end.
+
+abandon(Key, <<$*, _/binary>> = ClientKey) ->
+    case mnesia:dirty_read(?MXCLIENT, ClientKey) of
+        [] ->
+            unknown_client;
+        [Client] ->
+            call({abandon, Key, Client})
+    end.
+
+
 flush(all) ->
     mnesia:clear_table(?MXDEFER);
 
@@ -303,6 +322,14 @@ handle_call({info, Key}, _From, State) ->
 
 handle_call({set, Key, Opts}, _From, State) ->
     R = set(Key, Opts),
+    {reply, R, State};
+
+handle_call({own, Key, ClientKey}, _From, State) ->
+    R = own(Key, ClientKey),
+    {reply, R, State};
+
+handle_call({abandon, Key, ClientKey}, _From, State) ->
+    R = abandon(Key, ClientKey),
     {reply, R, State};
 
 handle_call(nodes, _From, State) ->
