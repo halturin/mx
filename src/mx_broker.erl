@@ -470,7 +470,8 @@ unregister(<<$*,_/binary>> = ClientKey) ->
             [unrelate(ClientKey, Ch) || Ch <- Client#?MXCLIENT.related],
             [abandon(I, Client) || I <- Client#?MXCLIENT.ownerof],
             mnesia:transaction(fun() -> mnesia:delete({?MXCLIENT, ClientKey}) end),
-            mx:send(?MXSYSTEM_CLIENTS_CHANNEL, {'$clients', offline, Client, ClientKey}),
+            mx:send(?MXSYSTEM_CLIENTS_CHANNEL,
+                    {'$clients', offline, Client#?MXCLIENT.name, ClientKey}),
             ok;
         [Client] ->
             [unrelate(ClientKey, Ch) || Ch <- Client#?MXCLIENT.related],
@@ -922,7 +923,7 @@ client_offline(<<$*, _/binary>> = ClientKey) ->
                 % unregistered client
                 pass;
             [Client] when Client#?MXCLIENT.monitor =:= true ->
-                mx:send(?MXSYSTEM_CLIENTS_CHANNEL, {'$clients', offline, Client#?MXCLIENT.name, Client#?MXCLIENT.key}),
+                mx:send(?MXSYSTEM_CLIENTS_CHANNEL, {'$clients', offline, Client#?MXCLIENT.name, ClientKey}),
                 C = Client#?MXCLIENT{handler = offline},
                 mnesia:write(C);
             [Client] when Client#?MXCLIENT.monitor =:= false ->
