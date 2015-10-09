@@ -597,10 +597,15 @@ own(<<$@,_/binary>> = PoolKey, Client) when is_record(Client, ?MXCLIENT) ->
         [] ->
             unknown_pool;
         [Pool] ->
-            Owners      = [Client#?MXCLIENT.key | Pool#?MXPOOL.owners],
-            UpdatedPool = Pool#?MXPOOL{owners = Owners},
-            mnesia:transaction(fun() ->mnesia:write(UpdatedPool) end),
-            ok
+            case lists:member(Client#?MXCLIENT.key, Pool#?MXPOOL.owners) of
+                false ->
+                    Owners      = [Client#?MXCLIENT.key | Pool#?MXPOOL.owners],
+                    UpdatedPool = Pool#?MXPOOL{owners = Owners},
+                    mnesia:transaction(fun() ->mnesia:write(UpdatedPool) end),
+                    ok;
+                true ->
+                    already_owned
+            end
     end;
 
 own(<<$#,_/binary>> = ChannelKey, Client) when is_record(Client, ?MXCLIENT) ->
@@ -608,10 +613,15 @@ own(<<$#,_/binary>> = ChannelKey, Client) when is_record(Client, ?MXCLIENT) ->
         [] ->
             unknown_channel;
         [Channel] ->
-            Owners          = [Client#?MXCLIENT.key | Channel#?MXCHANNEL.owners],
-            UpdatedChannel  = Channel#?MXCHANNEL{owners = Owners},
-            mnesia:transaction(fun() ->mnesia:write(UpdatedChannel) end),
-            ok
+            case lists:member(Client#?MXCLIENT.key, Channel#?MXCHANNEL.owners) of
+                false ->
+                    Owners          = [Client#?MXCLIENT.key | Channel#?MXCHANNEL.owners],
+                    UpdatedChannel  = Channel#?MXCHANNEL{owners = Owners},
+                    mnesia:transaction(fun() ->mnesia:write(UpdatedChannel) end),
+                    ok;
+                true ->
+                    already_owned
+            end
     end;
 
 own(_Key, _Client) ->
@@ -682,8 +692,14 @@ dispatch(Q, N, HasMessages) ->
                                 defer(P+1, To#?MXCLIENT.key, Message, none);
 
                             _ when is_binary(Parent) ->
-                                P = mx_queue:name(Q1),
-                                mx:send(Parent, Message, [{priority, P+1}]);
+                                ?DBG("remove offline/broken ClientKey from the pool: ~p", [To#?MXCLIENT.key]),
+                                mx:leave(To#?MXCLIENT.key, Parent),
+                                case mx_queue:name(Q1) of
+                                    10 ->
+                                        mx:send(Parent, Message, [{priority, 10}]);
+                                    P ->
+                                        mx:send(Parent, Message, [{priority, P+1}])
+                                end;
                             _ ->
                                 pass
                         end
@@ -693,10 +709,15 @@ dispatch(Q, N, HasMessages) ->
             dispatch(Q1, N - 1, true);
 
         % offline client with parent. return it to the parent.
-        {{value, {_, {_To, Message, Parent}}}, Q1} when is_binary(Parent) ->
-            ?DBG("Client is offline: ~p. Defer this message.", [To#?MXCLIENT.name]),
-            P = mx_queue:name(Q1),
-            mx:send(Parent, Message, [{priority, P+1}]),
+        {{value, {_, {To, Message, Parent}}}, Q1} when is_binary(Parent) ->
+            ?DBG("remove offline/broken ClientKey from the pool: ~p", [To#?MXCLIENT.key]),
+            mx:leave(To#?MXCLIENT.key, Parent),
+            case mx_queue:name(Q1) of
+                10 ->
+                    mx:send(Parent, Message, [{priority, 10}]);
+                P ->
+                    mx:send(Parent, Message, [{priority, P+1}])
+            end,
             dispatch(Q1, N - 1, true);
 
         % offline client with deferring
@@ -766,7 +787,7 @@ dispatch(Q, N, HasMessages) ->
                     mx:send(X, Message, [{priority, P}, {parent, To#?MXPOOL.key}])
             end,
             dispatch(Q1, N - 1, true);
-        {_FIXME, Q1} ->
+        {FIXME, Q1} ->
             ?DBG("FIXME: ~p", [FIXME]),
             dispatch(Q1, N - 1, true)
     end.
@@ -784,7 +805,7 @@ dispatch(QueuesTable) ->
                     {_, false} ->
                         HasMessagesAcc;
 
-                    _FIXME ->
+                    FIXME ->
                         ?DBG("FIXME: ~p", [FIXME]),
                         false
                 end

@@ -148,7 +148,7 @@ handle_cast({master, Master}, State) ->
     case mnesia:change_config(extra_db_nodes, [Master]) of
         [] ->
             throw({error, "failed to start Mnesia in slave mode"});
-        {ok, _Cluster} ->
+        {ok, Cluster} ->
             % FIXME.
             ?DBG("Mnesia cluster: ~p", [Cluster]),
             ok
