@@ -238,6 +238,16 @@ handle_call({info, <<$@, _/binary>> = PoolKey}, _From, State) ->
             {reply, R, State}
     end;
 
+handle_call({relation, Key}, _From, State) ->
+    case mnesia:dirty_read(?MXRELATION, Key) of
+        [] ->
+            {reply, unknown_key, State};
+        [Related] ->
+            R = lists:zip(record_info(fields, ?MXRELATION), tl(tuple_to_list(Related))),
+            {reply, R, State}
+    end;
+
+
 handle_call({relate, Key, To}, _From, State) ->
     R = action(relate, Key, To),
     {reply, R, State};

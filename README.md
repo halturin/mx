@@ -83,9 +83,6 @@ now you can call mx:nodes() to get the list of mx cluster nodes.
           Key - binary (ClientKey, ChannelKey, PoolKey)  
           Opts - proplists
 
-    **mx:info(Key)**  
-          Key - binary (ClientKey, ChannelKey, PoolKey)
-
 * Sending message  
   **mx:send(ClientKey, Message)**  
   **mx:send(ChannelKey, Message)**  
@@ -108,6 +105,14 @@ now you can call mx:nodes() to get the list of mx cluster nodes.
     **mx:nodes()**  
         show MX cluster nodes
 
+    **mx:info(Key)**  
+          Key - binary (ClientKey, ChannelKey, PoolKey)
+
+    **mx:relation(Key)**  
+          Key - binary (ChannelKey, PoolKey)  
+          shows list of Clients are subscribed/joined to.
+
+
 ### remote use
 
 You have to use **gen_server:call(MX, Message)**, where
@@ -127,6 +132,7 @@ You have to use **gen_server:call(MX, Message)**, where
 - {own, Key, ClientKey}
 - {abandon, Key, ClientKey}
 - {info, Key}
+- {relation, Key}
 - {set, Key, Opts}
 - nodes
 

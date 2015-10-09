@@ -39,11 +39,11 @@
 -define(MXRELATION,                 mx_table_relation).
 -define(MXKV,                       mx_table_kv).
 
-% '$system'
+% '%system'
 -define(MXSYSTEM_CHANNEL,           <<35,1,205,204,237,249,21,234,116,63,125,148,219,82,19,237,212>>).
-% '$clients'
+% '%clients'
 -define(MXSYSTEM_CLIENTS_CHANNEL,   <<35,218,100,92,158,250,171,65,140,165,196,6,41,174,67,121,214>>).
-% '$queues'
+% '%queues'
 -define(MXSYSTEM_QUEUES_CHANNEL,    <<35,44,214,227,18,198,49,63,136,180,212,33,133,149,223,21,136>>).
 
 
@@ -95,7 +95,7 @@
 -record(?MXCHANNEL, {
     key         :: binary(),          % <<$#,Md5Hash/binary>> (<<35,...>>)
     name        :: binary(),
-    related     :: list(),            % in case of tree-like subscriptions (example: pool of channels)
+    related     :: list(),            % subscribed/joined to. in case of tree-like subscriptions (example: pool of channels)
     owners      :: list(),            % owners (who can publish here)
     priority    = 5 :: non_neg_integer(),   % priority
     defer       = true :: boolean(),        % deferrable. defer message when exceed the queue limit
@@ -105,7 +105,7 @@
 -record(?MXPOOL, {
     key         :: binary(),            % <<$@,Md5Hash/binary>> (<<64,...>>)
     name        :: binary(),
-    related     :: list(),              % in case of tree-like pooling (example: channel of pools)
+    related     :: list(),              % subscribed/joined to. in case of tree-like pooling (example: channel of pools)
     owners      :: list(),
     balance     = rr :: rr | hash | random,      % balance type
     priority    = 5 :: non_neg_integer(),
