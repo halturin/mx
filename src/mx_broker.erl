@@ -273,6 +273,14 @@ handle_call({set, <<$*, _/binary>> = ClientKey, Opts}, _From, State) ->
                 comment = proplists:get_value(comment, Opts, Client#?MXCLIENT.comment)
             },
             mnesia:transaction(fun() -> mnesia:write(Client1) end),
+
+            case Client#?MXCLIENT.handler =:= Client1#?MXCLIENT.handler of
+                false when Client1#?MXCLIENT.monitor =:= true ->
+                    % handler has been changed. notify 'online' if its monitored
+                    mx:send(?MXSYSTEM_CLIENTS_CHANNEL, {'$clients', online, Client#?MXCLIENT.name, Client#?MXCLIENT.key});
+                _ ->
+                    pass
+            end,
             {reply, ok, State}
     end;
 
