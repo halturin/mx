@@ -62,10 +62,10 @@
 
 register(client, Client, Opts) when is_binary(Client) ->
     case call({register_client, Client, Opts}) of
-        {clientkey, ClientKey} ->
+        {M, ClientKey} when M == clientkey; M == duplicate ->
             Node            = proplists:get_value(handler, Opts, self()),
             monitor_node(erlang:node(Node), ClientKey),
-            {clientkey, ClientKey};
+            {M, ClientKey};
         E ->
             E
     end;
