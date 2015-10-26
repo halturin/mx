@@ -108,6 +108,10 @@ now you can call mx:nodes() to get the list of mx cluster nodes.
     **mx:info(Key)**  
           Key - binary (ClientKey, ChannelKey, PoolKey)
 
+    **mx:info(Key, Name)**
+          Key - binary (ClientKey, ChannelKey, PoolKey)  
+          Name - field name
+
     **mx:relation(Key)**  
           Key - binary (ChannelKey, PoolKey)  
           shows list of Clients are subscribed/joined to.
@@ -132,6 +136,7 @@ You have to use **gen_server:call(MX, Message)**, where
 - {own, Key, ClientKey}
 - {abandon, Key, ClientKey}
 - {info, Key}
+- {info, {Key, Name}}
 - {relation, Key}
 - {set, Key, Opts}
 - nodes

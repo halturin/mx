@@ -125,7 +125,7 @@ handle_call({register_client, Client, Opts}, {Pid, _}, State) ->
             case mnesia:transaction(fun() -> mnesia:write(C) end) of
                 {aborted, E} ->
                     {reply, E, State};
-                _ when C#?MXCLIENT.monitor =:= true ->
+                _ when C#?MXCLIENT.monitor =:= true, is_pid(C#?MXCLIENT.handler) ->
                     mx:send(?MXSYSTEM_CLIENTS_CHANNEL, {'$clients', online, Client, ClientKey}),
                     {reply, {clientkey, ClientKey}, State};
                 _ ->
@@ -236,6 +236,15 @@ handle_call({info, <<$@, _/binary>> = PoolKey}, _From, State) ->
         [Pool] ->
             R = lists:zip(record_info(fields, ?MXPOOL), tl(tuple_to_list(Pool))),
             {reply, R, State}
+    end;
+
+handle_call({info, {Key, Name}}, From, State) ->
+    case handle_call({info, Key}, From, State) of
+        {_,R,_} when is_list(R) ->
+            R1 = proplists:get_value(Name, R),
+            {reply, R1, State};
+        Value ->
+            Value
     end;
 
 handle_call({relation, Key}, _From, State) ->

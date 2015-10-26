@@ -45,6 +45,7 @@
          send/2,
          send/3,
          info/1,
+         info/2,
          relation/1,
          set/2,
          own/2,
@@ -159,6 +160,9 @@ leave(Key, Pool) when is_binary(Pool) ->
 
 info(Key) ->
     call({info, Key}).
+
+info(Key, Name) ->
+    call({info, {Key, Name}}).
 
 relation(Key) ->
     call({relation, Key}).
@@ -322,6 +326,10 @@ handle_call({leave, Client, From}, _From, State) ->
 
 handle_call({info, Key}, _From, State) ->
     R = info(Key),
+    {reply, R, State};
+
+handle_call({info, {Key, Name}}, _From, State) ->
+    R = info(Key, Name),
     {reply, R, State};
 
 handle_call({relation, Key}, _From, State) ->
