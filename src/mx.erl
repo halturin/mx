@@ -40,6 +40,7 @@
          unregister/1,
          subscribe/2,
          unsubscribe/2,
+         offline/1,
          join/2,
          leave/2,
          send/2,
@@ -64,8 +65,13 @@
 register(client, Client, Opts) when is_binary(Client) ->
     case call({register_client, Client, Opts}) of
         {M, ClientKey} when M == clientkey; M == duplicate ->
-            Node            = proplists:get_value(handler, Opts, self()),
-            monitor_node(erlang:node(Node), ClientKey),
+            Node = proplists:get_value(handler, Opts, self()),
+            case catch erlang:node(Node) of
+                {'EXIT', _} ->
+                    pass;
+                N ->
+                    monitor_node(N, ClientKey)
+            end,
             {M, ClientKey};
         E ->
             E
@@ -92,6 +98,11 @@ register(client, X) ->
 
 unregister(Key) ->
     call({unregister, Key}).
+
+offline(<<$*,_/binary>> = ClientKey) ->
+    cast({offline, ClientKey});
+offline(Key) ->
+    unknown_client.
 
 subscribe(Key, Channel) when is_list(Channel) ->
     ChannelHash = erlang:md5(list_to_binary(Channel)),
@@ -308,6 +319,10 @@ handle_call({unregister, Key}, _From, State) ->
     R = call({unregister, Key}),
     {reply, R, State};
 
+handle_call({offline, ClientKey}, _From, State) ->
+    R = offline(ClientKey),
+    {reply, R, State};
+
 handle_call({subscribe, Client, To}, _From, State) ->
     R = subscribe(Client, To),
     {reply, R, State};
@@ -324,12 +339,12 @@ handle_call({leave, Client, From}, _From, State) ->
     R = leave(Client, From),
     {reply, R, State};
 
-handle_call({info, Key}, _From, State) ->
-    R = info(Key),
-    {reply, R, State};
-
 handle_call({info, {Key, Name}}, _From, State) ->
     R = info(Key, Name),
+    {reply, R, State};
+
+handle_call({info, Key}, _From, State) ->
+    R = info(Key),
     {reply, R, State};
 
 handle_call({relation, Key}, _From, State) ->
@@ -557,12 +572,10 @@ demonitor_node(Node) ->
     case mnesia:transaction(fun() ->
             case mnesia:read(?MXKV, {monitor, erlang:node(), Node}, read) of
                 [] ->
-                    erlang:monitor_node(Node, false),
                     [];
                 [#?MXKV{key = K, value = V}] ->
                     ?DBG("Demonitor node (~p): set offline - ~p", [Node,V]),
                     mnesia:transaction(fun() -> mnesia:delete({?MXKV, K}) end),
-                    erlang:monitor_node(Node, false),
                     V
             end
          end) of

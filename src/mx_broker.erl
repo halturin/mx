@@ -284,9 +284,11 @@ handle_call({set, <<$*, _/binary>> = ClientKey, Opts}, _From, State) ->
             mnesia:transaction(fun() -> mnesia:write(Client1) end),
 
             case Client#?MXCLIENT.handler =:= Client1#?MXCLIENT.handler of
-                false when Client1#?MXCLIENT.monitor =:= true ->
+                false when Client1#?MXCLIENT.monitor =:= true, is_pid(Client1#?MXCLIENT.handler) ->
                     % handler has been changed. notify 'online' if its monitored
                     mx:send(?MXSYSTEM_CLIENTS_CHANNEL, {'$clients', online, Client#?MXCLIENT.name, Client#?MXCLIENT.key});
+                false when Client1#?MXCLIENT.monitor =:= true ->
+                    mx:send(?MXSYSTEM_CLIENTS_CHANNEL, {'$clients', offline, Client#?MXCLIENT.name, Client#?MXCLIENT.key});
                 _ ->
                     pass
             end,
