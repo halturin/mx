@@ -107,7 +107,7 @@ offline(Key) ->
 
 online(<<$*,_/binary>> = ClientKey, Pid) when is_pid(Pid) ->
     cast({online, ClientKey});
-online(Key) ->
+online(Key, Pid) ->
     unknown_client.
 
 subscribe(Key, Channel) when is_list(Channel) ->
