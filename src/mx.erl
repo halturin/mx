@@ -41,6 +41,7 @@
          subscribe/2,
          unsubscribe/2,
          offline/1,
+         online/2,
          join/2,
          leave/2,
          send/2,
@@ -102,6 +103,11 @@ unregister(Key) ->
 offline(<<$*,_/binary>> = ClientKey) ->
     cast({offline, ClientKey});
 offline(Key) ->
+    unknown_client.
+
+online(<<$*,_/binary>> = ClientKey, Pid) when is_pid(Pid) ->
+    cast({online, ClientKey});
+online(Key) ->
     unknown_client.
 
 subscribe(Key, Channel) when is_list(Channel) ->
@@ -321,6 +327,10 @@ handle_call({unregister, Key}, _From, State) ->
 
 handle_call({offline, ClientKey}, _From, State) ->
     R = offline(ClientKey),
+    {reply, R, State};
+
+handle_call({online, ClientKey, Pid}, _From, State) ->
+    R = online(ClientKey, Pid),
     {reply, R, State};
 
 handle_call({subscribe, Client, To}, _From, State) ->

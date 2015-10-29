@@ -67,6 +67,10 @@ now you can call mx:nodes() to get the list of mx cluster nodes.
 * Delete client/channel/pool  
     **mx:unregister(Key)**
 
+* Set online/offline state  
+    **mx:online(ClientKey, Pid)**  
+    **mx:offline(ClientKey)**  
+
 * Work with channel/pool  
     **mx:subscribe(Key, Channel)**  
     **mx:unsubscribe(Key, Channel)**  
@@ -128,6 +132,8 @@ You have to use **gen_server:call(MX, Message)**, where
 - {register_pool, PoolName, ClientKey}
 - {register_pool, PoolName, ClientKey, Opts}
 - {unregister, Key}
+- {online, ClientKey, Pid}
+- {offline, ClientKey}
 - {subscribe, Client, To}
 - {unsubscribe, Client, From}
 - {join, Client, To}

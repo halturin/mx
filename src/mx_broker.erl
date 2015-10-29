@@ -432,6 +432,10 @@ handle_cast({offline, ClientKey}, State) ->
     client_offline(ClientKey),
     {noreply, State};
 
+handle_cast({online, ClientKey, Pid}, State) ->
+    client_online(ClientKey, Pid),
+    {noreply, State};
+
 handle_cast(Msg, State) ->
     ?ERR("unhandled cast: ~p", [Msg]),
     {noreply, State}.
@@ -951,3 +955,18 @@ client_offline(<<$*, _/binary>> = ClientKey) ->
         end
     end).
 
+client_online(<<$*, _/binary>> = ClientKey, Pid) ->
+    mnesia:transaction(fun() ->
+        case mnesia:wread({?MXCLIENT, ClientKey}) of
+            [] ->
+                % unregistered client
+                pass;
+            [Client] when Client#?MXCLIENT.monitor =:= true ->
+                mx:send(?MXSYSTEM_CLIENTS_CHANNEL, {'$clients', online, Client#?MXCLIENT.name, ClientKey}),
+                C = Client#?MXCLIENT{handler = Pid},
+                mnesia:write(C);
+            [Client] when Client#?MXCLIENT.monitor =:= false ->
+                C = Client#?MXCLIENT{handler = Pid},
+                mnesia:write(C)
+        end
+    end).
