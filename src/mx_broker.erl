@@ -169,7 +169,13 @@ handle_call({register_channel, Channel, ClientKey, Opts}, _From, State) ->
                     end;
 
                 [_Channel] ->
-                    {reply, {duplicate, ChannelKey}, State}
+                    case proplists:get_value(own, Opts, false) of
+                        true ->
+                            own(ChannelKey, Client),
+                            {reply, {duplicate, ChannelKey}, State};
+                        false ->
+                            {reply, {duplicate, ChannelKey}, State}
+                    end
             end
     end;
 
@@ -206,8 +212,13 @@ handle_call({register_pool, Pool, ClientKey, Opts}, _From, State) ->
                     end;
 
                 [_Pool] ->
-                    {reply, {duplicate, PoolKey}, State}
-
+                    case proplists:get_value(own, Opts, false) of
+                        true ->
+                            own(PoolKey, Client),
+                            {reply, {duplicate, PoolKey}, State};
+                        false ->
+                            {reply, {duplicate, PoolKey}, State}
+                    end
             end
     end;
 
