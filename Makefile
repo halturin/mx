@@ -43,20 +43,20 @@ dialyze: build-plt
 run: debug
 	@echo "[ Run (debug mode)... ]"
 	@$(ERL) -name mxnode01@127.0.0.1\
-                -pa ebin deps/*/ebin  ../deps/*/ebin ../*/ebin\
+                -pa ebin deps/*/ebin \
                 -s mx_helper\
                 -setcookie devcook -Ddebug=true
 
 runnodeb: clean compile
 	@echo "[ Run (debug mode)... ]"
 	@$(ERL) -name mxnode01@127.0.0.1\
-                -pa ebin deps/*/ebin  ../deps/*/ebin ../*/ebin\
+                -pa ebin deps/*/ebin \
                 -s mx_helper\
                 -setcookie devcook
 run2: debug
 	@echo "[ Run (debug mode)... ]"
 	@$(ERL) -name mxnode02@127.0.0.1\
-                -pa ebin deps/*/ebin  ../deps/*/ebin ../*/ebin\
+                -pa ebin deps/*/ebin \
                 -s mx_helper\
                 -mxmaster mxnode01@127.0.0.1\
                 -setcookie devcook -Ddebug=true
