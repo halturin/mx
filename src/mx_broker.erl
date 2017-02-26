@@ -808,7 +808,7 @@ dispatch(Q, N, HasMessages) ->
                     end);
 
                 [Relations] when To#?MXPOOL.balance == random ->
-                    N = random:uniform(length(Relations#?MXRELATION.related)),
+                    N = rand:uniform(length(Relations#?MXRELATION.related)),
                     X = lists:nth(N, Relations#?MXRELATION.related),
                     ?DBG("Dispatch message to the pool [~p]. Send to [~p] of [~p] ",
                         [To#?MXPOOL.name, N, length(Relations#?MXRELATION.related)]),
