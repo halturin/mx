@@ -8,7 +8,7 @@ mixing it (pool of channels, channel of pools) and even create crazy complex mes
 
 You can set priority for message processing (range: 1..10).
 
-Pool have 3 balance methods: rr(round robin), hash (by erlang:phash(Message, lenth(Pool))), random.
+Pool has 3 balance methods: rr(round robin), hash (by erlang:phash(Message, lenth(Pool))), random.
 
 Message can be deferred on:
 
@@ -16,7 +16,7 @@ Message can be deferred on:
 
 - client has 'offline' state and the 'defer' option is set to 'true'
 
-You have to set 'async' Client option to 'false' for delivery control. Default value of this option is 'true'.
+Using 'async' Client option allows you control the delivery process. Default value of this option is 'true'.
 
 ## Distributed mode
 
