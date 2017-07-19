@@ -1,62 +1,40 @@
-REBAR       ?= ./rebar
+REBAR       = $(shell pwd)/rebar3
 DIALYZER    ?= dialyzer
-ERL         ?= erl +A 4 +K true
-
 
 DIALYZER_WARNINGS = -Wunmatched_returns -Werror_handling \
                     -Wrace_conditions -Wunderspecs
 
-.PHONY: all compile test qc clean get-deps build-plt dialyze
+.PHONY: deps compile
 
 all: compile
 
-compile:
+compile: clean
 	@$(REBAR) compile
 
-debug:
-	@$(REBAR) compile -Ddebug
-
 test: compile
-	@$(REBAR) eunit skip_deps=true
-
-qc: compile
-	@$(REBAR) qc skip_deps=true
-
-clean:
-	@$(REBAR) clean
-
-get-deps:
-	@$(REBAR) get-deps
+	@$(REBAR) as test eunit skip_deps=true
 
 ct:
 	@$(REBAR) skip_deps=true ct
 
-.dialyzer_plt:
+clean:
+	@$(REBAR) clean
+
+deps:
+	@$(REBAR) deps
+
+build-plt:
 	@$(DIALYZER) --build_plt --output_plt .dialyzer_plt \
 	    --apps kernel stdlib
-
-build-plt: .dialyzer_plt
 
 dialyze: build-plt
 	@$(DIALYZER) --src src --plt .dialyzer_plt $(DIALYZER_WARNINGS)
 
-run: debug
-	@echo "[ Run (debug mode)... ]"
-	@$(ERL) -name mxnode01@127.0.0.1\
-                -pa ebin deps/*/ebin \
-                -s mx_helper\
-                -setcookie devcook -Ddebug=true
+rel: compile
+	$(REBAR) release
 
-runnodeb: clean compile
-	@echo "[ Run (debug mode)... ]"
-	@$(ERL) -name mxnode01@127.0.0.1\
-                -pa ebin deps/*/ebin \
-                -s mx_helper\
-                -setcookie devcook
-run2: debug
-	@echo "[ Run (debug mode)... ]"
-	@$(ERL) -name mxnode02@127.0.0.1\
-                -pa ebin deps/*/ebin \
-                -s mx_helper\
-                -mxmaster mxnode01@127.0.0.1\
-                -setcookie devcook -Ddebug=true
+release: compile
+	$(REBAR) as prod release
+
+run: rel
+	$(REBAR) run

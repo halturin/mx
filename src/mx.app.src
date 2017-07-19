@@ -8,7 +8,9 @@
                   stdlib
                  ]},
   {mod, { mx_app, []}},
-  {env, [
-    {config, "conf/mx.conf"}
-  ]}
+  {modules, []},
+  {included_applications, []},
+  {maintainers, []},
+  {licenses, []},
+  {links, []}
  ]}.
