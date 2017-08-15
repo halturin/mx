@@ -102,12 +102,12 @@ unregister(Key) ->
 
 offline(<<$*,_/binary>> = ClientKey) ->
     cast({offline, ClientKey});
-offline(Key) ->
+offline(_Key) ->
     unknown_client.
 
 online(<<$*,_/binary>> = ClientKey, Pid) when is_pid(Pid) ->
     cast({online, ClientKey});
-online(Key, Pid) ->
+online(_Key, _Pid) ->
     unknown_client.
 
 subscribe(Key, Channel) when is_list(Channel) ->

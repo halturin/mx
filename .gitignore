@@ -1,7 +1,7 @@
 deps
 ebin
 log
-.rebar
+.rebar*
 .eunit
 *.o
 *.beam

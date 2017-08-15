@@ -4,17 +4,8 @@
 -define(CURRENT_FUN_NAME, element(2, element(2, process_info(self(), current_function)))).
 -define(CURRENT_FUN_NAME_STR, atom_to_list(?CURRENT_FUN_NAME)).
 
--ifdef(debug).
-
 -define(DBG(Format),                lager:log(debug, self(), "~p:~p: " ++ Format, [?MODULE, ?LINE])).
 -define(DBG(Format, Data),          lager:log(debug, self(), "~p:~p: " ++ Format, [?MODULE, ?LINE | Data])).
-
--else.
-
--define(DBG(Format),                ok).
--define(DBG(Format, Data),          ok).
-
--endif. % debug
 
 -define(INFO(Format),               lager:log(info, self(), "~p:~p: " ++ Format, [?MODULE, ?LINE])).
 -define(INFO(Format, Data),         lager:log(info, self(), "~p:~p: " ++ Format, [?MODULE, ?LINE | Data])).
