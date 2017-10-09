@@ -2,21 +2,16 @@
 
 ## Overview
 
-Universal OTP message broker allows to create channels (pub/sub), pools,
-mixing it (pool of channels, channel of pools) and even create crazy complex messaging
-(something like: pool of [pool of [...], clients, channels of [...]]).
-
-You can set priority for message processing (range: 1..10).
-
-Pool has 3 balance methods: rr(round robin), hash (by erlang:phash(Message, lenth(Pool))), random.
-
-Message can be deferred on:
-
-- exceed the queue limit (10000) and receiver has the 'true' in 'defer' option.
-
-- client has 'offline' state and the 'defer' option is set to 'true'
-
-Using 'async' Client option allows you control the delivery process. Default value of this option is 'true'.
+Universal OTP message broker features:
+* create channels (pub/sub)
+* pools (workers queue)
+* mixing it (pool of channels, channel of pools... etc.)
+* send messages with specify priority of delivering messages (range: 1..10)
+* pool has 3 balance methods: rr(round robin), hash (by erlang:phash(Message, lenth(Pool))), random
+* defer message delivering in case of
+    - exceed the queue limit (10000) and receiver has the 'true' in 'defer' option.
+    - client has 'offline' state and the 'defer' option is set to 'true'
+* 'async' Client option allows you control the delivery process. Default value of this option is 'true'.
 
 ## Distributed mode
 
@@ -40,90 +35,90 @@ now you can call mx:nodes() to get the list of mx cluster nodes.
 
 * Create client/channel/pool
 
-    **mx:register(client, Name)**  
-    **mx:register(client, Name, Opts)**  
-    Name - list or binary  
-    Opts - proplists  
-    returns: {clientkey, Key}  
+    **mx:register(client, Name)**
+    **mx:register(client, Name, Opts)**
+    Name - list or binary
+    Opts - proplists
+    returns: {clientkey, Key}
                    {duplicate, Key}
             Key - binary
 
-    **mx:register(channel, Name, ClientKey)**  
-    **mx:register(channel, Name, ClientKey, Opts)**  
-          Name - list or binary  
-          Opts - proplists  
-          ClientKey - binary  
-          returns: {channelkey, Key}  
+    **mx:register(channel, Name, ClientKey)**
+    **mx:register(channel, Name, ClientKey, Opts)**
+          Name - list or binary
+          Opts - proplists
+          ClientKey - binary
+          returns: {channelkey, Key}
                    {duplicate, Key}
 
-    **mx:register(pool, Name, ClientKey)**  
-    **mx:register(pool, Name, ClientKey, Opts)**  
-          Name - list or binary  
-          Opts - proplists  
-          ClientKey - binary  
-          returns: {poolkey, Key}  
-                   {duplicate, Key}  
+    **mx:register(pool, Name, ClientKey)**
+    **mx:register(pool, Name, ClientKey, Opts)**
+          Name - list or binary
+          Opts - proplists
+          ClientKey - binary
+          returns: {poolkey, Key}
+                   {duplicate, Key}
 
-* Delete client/channel/pool  
+* Delete client/channel/pool
     **mx:unregister(Key)**
 
-* Set online/offline state  
-    **mx:online(ClientKey, Pid)**  
-    **mx:offline(ClientKey)**  
+* Set online/offline state
+    **mx:online(ClientKey, Pid)**
+    **mx:offline(ClientKey)**
 
-* Work with channel/pool  
-    **mx:subscribe(Key, Channel)**  
-    **mx:unsubscribe(Key, Channel)**  
-          Key - binary (ClientKey, ChannelKey, PoolKey)  
+* Work with channel/pool
+    **mx:subscribe(Key, Channel)**
+    **mx:unsubscribe(Key, Channel)**
+          Key - binary (ClientKey, ChannelKey, PoolKey)
           Channel - channel name or channel key
 
-    **mx:join(Key, Pool)**  
-    **mx:leave(key, Pool)**  
-          Key - binary (ClientKey, ChannelKey, PoolKey)  
+    **mx:join(Key, Pool)**
+    **mx:leave(key, Pool)**
+          Key - binary (ClientKey, ChannelKey, PoolKey)
           Pool - pool name or pool key
 
-* Set options for client/channel/pool  
-    **mx:set(Key, Opts)**  
-          Key - binary (ClientKey, ChannelKey, PoolKey)  
+* Set options for client/channel/pool
+    **mx:set(Key, Opts)**
+          Key - binary (ClientKey, ChannelKey, PoolKey)
           Opts - proplists
 
-* Sending message  
-  **mx:send(ClientKey, Message)**  
-  **mx:send(ChannelKey, Message)**  
+* Sending message
+  **mx:send(ClientKey, Message)**
+  **mx:send(ChannelKey, Message)**
   **mx:send(PoolKey, Message)**
 
-* Owning Pool/Channel  
-  **mx:own(Key, ClientKey)**  
+* Owning Pool/Channel
+  **mx:own(Key, ClientKey)**
           Key - binary (ChannelKey, PoolKey)
 
-  **mx:abandon(Key, ClientKey)**  
-          Key - binary (ChannelKey, PoolKey)  
+  **mx:abandon(Key, ClientKey)**
+          Key - binary (ChannelKey, PoolKey)
           orphan Pool/Channel will unregister automaticaly
 
-* Clear deferred messages  
-    **mx:flush(Key)**  
-        Key - binary (ClientKey, ChannelKey, PoolKey)  
+* Clear deferred messages
+    **mx:flush(Key)**
+        Key - binary (ClientKey, ChannelKey, PoolKey)
         all - truncate the 'deferred' table
 
-* Info  
-    **mx:nodes()**  
+* Info
+    **mx:nodes()**
         show MX cluster nodes
 
-    **mx:info(Key)**  
+    **mx:info(Key)**
           Key - binary (ClientKey, ChannelKey, PoolKey)
 
     **mx:info(Key, Name)**
-          Key - binary (ClientKey, ChannelKey, PoolKey)  
+          Key - binary (ClientKey, ChannelKey, PoolKey)
           Name - field name
 
-    **mx:relation(Key)**  
-          Key - binary (ChannelKey, PoolKey)  
+    **mx:relation(Key)**
+          Key - binary (ChannelKey, PoolKey)
           shows list of Clients are subscribed/joined to.
 
 
 ### remote use
 
-You have to use **gen_server:call(MX, Message)**, where
+use **gen_server:call(MX, Message)**, where
 **MX** is tuple like {mx, 'nodename'} and **Message** is one of listed values below:
 - {register_client, Client}
 - {register_client, Client, Opts}
@@ -193,4 +188,56 @@ mx:join(Client3Key, Pool1Key),
 {poolkey, Rand_Pl}    = mx:register(pool, "Pool (random) ", Client2Key, [balance, hash}]),
 
 ```
+
+## Testing
+
+There are only common tests (CT) are implemented with some limited set of cases
+
+### Channel tests (pub/sub).
+
+Sequentualy running:
+
+  * 1 client (subscriber) recieves 1 messages
+  * 1 client - 1000 messages
+  * 1000 clients - 1 messages
+  * 1000 clients - 10 messages
+
+Parallel: _(not implemented)_
+  * 1000 clients - 10 messages (10 processes)
+
+Priority delivering: _(not implemented)_
+   * 1 client recieves: 
+    100 messages with priority 1, 
+    100 messages with prio 2,
+    ...
+    100 messages with prio 10
+    
+
+### Pool tests (worker queue)
+
+Sequentualy running: _(not implemented)_
+
+  * 1 client (sender) sends 1 messages to 1 worker
+  * 1 client - 1000 messages - 2 workers (round robin)
+  * 1 client - 1000 messages - 2 workers (hash)
+  * 1 client - 1000 messages - 2 workers (random)
+  * 1000 clients - 1 messages - 4 workers
+  * 1000 clients - 1000 messages - 4 workers
+
+Parallel: _(not implemented)_
+  * 1000 clients - 10 messages (10 processes)
+
+### Run the testing
+1. Run MX application as standalone application
+
+```shell
+$ make run
+```
+
+2. Run "Common Tests"
+
+```shell
+$ make ct
+```
+
 
