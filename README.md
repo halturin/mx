@@ -215,27 +215,27 @@ gen_server:call(MX, Message)
 ```
 where the `Message` is one of the listed values below:
 
-- {register_client, Client}
-- {register_client, Client, Opts}
-- {register_channel, ChannelName, ClientKey}
-- {register_channel, ChannelName, ClientKey, Opts}
-- {register_pool, PoolName, ClientKey}
-- {register_pool, PoolName, ClientKey, Opts}
-- {unregister, Key}
-- {online, ClientKey, Pid}
-- {offline, ClientKey}
-- {subscribe, Client, To}
-- {unsubscribe, Client, From}
-- {join, Client, To}
-- {leave, Client, From}
-- {send, To, Message}
-- {own, Key, ClientKey}
-- {abandon, Key, ClientKey}
-- {info, Key}
-- {info, {Key, Name}}
-- {relation, Key}
-- {set, Key, Opts}
-- nodes
+- `{register_client, Client}`
+- `{register_client, Client, Opts}`
+- `{register_channel, ChannelName, ClientKey}`
+- `{register_channel, ChannelName, ClientKey, Opts}`
+- `{register_pool, PoolName, ClientKey}`
+- `{register_pool, PoolName, ClientKey, Opts}`
+- `{unregister, Key}`
+- `{online, ClientKey, Pid}`
+- `{offline, ClientKey}`
+- `{subscribe, Client, To}`
+- `{unsubscribe, Client, From}`
+- `{join, Client, To}`
+- `{leave, Client, From}`
+- `{send, To, Message}`
+- `{own, Key, ClientKey}`
+- `{abandon, Key, ClientKey}`
+- `{info, Key}`
+- `{info, {Key, Name}}`
+- `{relation, Key}`
+- `{set, Key, Opts}`
+- `nodes`
 
 ```erlang
 > (mxnode02@127.0.0.1)2> gen_server:call({mx, 'mxnode01@127.0.0.1'}, nodes).
