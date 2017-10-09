@@ -84,13 +84,16 @@ mx:join(Client3Key, Pool1Key),
 
 * Create client/channel/pool
 
-    **mx:register(client, Name)**
-    **mx:register(client, Name, Opts)**
-    Name - list or binary
-    Opts - proplists
-    returns: {clientkey, Key}
-                   {duplicate, Key}
-            Key - binary
+    ```erlang 
+    mx:register(client, Name)
+    mx:register(client, Name, Opts)
+    ```
+       _Name_ - list or binary
+       _Opts_ - proplists
+    
+    returns: `[{clientkey, Key}| {duplicate, Key}]`
+    
+       _Key_ - binary
 
     **mx:register(channel, Name, ClientKey)**
     **mx:register(channel, Name, ClientKey, Opts)**
@@ -203,35 +206,35 @@ There are only common tests (CT) are implemented with some limited set of cases
 
 Sequentualy running:
 
-  * 1 client (subscriber) recieves 1 messages
-  * 1 client - 1000 messages
-  * 1000 clients - 1 messages
-  * 1000 clients - 10 messages
+  * [x] 1 client (subscriber) recieves 1 messages
+  * [x] 1 client - 1000 messages
+  * [x] 1000 clients - 1 messages
+  * [x] 1000 clients - 10 messages
 
-Parallel: _(not implemented)_
-  * 1000 clients - 10 messages (10 processes)
+Parallel: 
+  * [ ] 1000 clients - 10 messages (10 processes)
 
-Priority delivering: _(not implemented)_
-   * 1 client recieves: 
-    100 messages with priority 1, 
-    100 messages with prio 2,
-    ...
-    100 messages with prio 10
+Priority delivering:
+  * 1 client recieves 1000 messages with 10 different priorities: 
+    * [ ] 100 messages with priority 1
+    * [ ] 100 messages with priority 2
+    * [ ] ...
+    * [ ] 100 messages with priority 10
     
 
 ### Pool tests (worker queue)
 
-Sequentualy running: _(not implemented)_
+Sequentualy running:
 
-  * 1 client (sender) sends 1 messages to 1 worker
-  * 1 client - 1000 messages - 2 workers (round robin)
-  * 1 client - 1000 messages - 2 workers (hash)
-  * 1 client - 1000 messages - 2 workers (random)
-  * 1000 clients - 1 messages - 4 workers
-  * 1000 clients - 1000 messages - 4 workers
+  * [ ] 1 client (sender) sends 1 messages to 1 worker
+  * [ ] 1 client - 1000 messages - 2 workers (round robin)
+  * [ ] 1 client - 1000 messages - 2 workers (hash)
+  * [ ] 1 client - 1000 messages - 2 workers (random)
+  * [ ] 1000 clients - 1 messages - 4 workers
+  * [ ] 1000 clients - 1000 messages - 4 workers
 
 Parallel: _(not implemented)_
-  * 1000 clients - 10 messages (10 processes)
+  * [ ] 1000 clients - 10 messages (10 processes)
 
 ### Run the testing
 1. Run MX application as standalone application
