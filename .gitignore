@@ -8,4 +8,5 @@ log
 _*
 erl_crash.dump
 Mnesia*
+.dialyzer_plt
 
