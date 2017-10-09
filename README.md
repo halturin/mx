@@ -80,7 +80,7 @@ mx:join(Client3Key, Pool1Key),
 
 ## API
 
-### local use
+### local usage
 
 * Create client/channel/pool
 
@@ -88,89 +88,133 @@ mx:join(Client3Key, Pool1Key),
     mx:register(client, Name)
     mx:register(client, Name, Opts)
     ```
-       _Name_ - list or binary
-       _Opts_ - proplists
+       Name - list or binary
+       Opts - proplists
     
-    returns: `[{clientkey, Key}| {duplicate, Key}]`
+    returns: `{clientkey, Key} | {duplicate, Key}`
     
-       _Key_ - binary
+       Key - binary
 
-    **mx:register(channel, Name, ClientKey)**
-    **mx:register(channel, Name, ClientKey, Opts)**
-          Name - list or binary
-          Opts - proplists
-          ClientKey - binary
-          returns: {channelkey, Key}
-                   {duplicate, Key}
+    ```erlang 
+    mx:register(channel, Name, ClientKey)
+    mx:register(channel, Name, ClientKey, Opts)
+    ```
+       Name - list or binary
+       Opts - proplists
+       ClientKey - binary
+       
+    returns: `{channelkey, Key} | {duplicate, Key}`
+    
+       Key - binary
 
-    **mx:register(pool, Name, ClientKey)**
-    **mx:register(pool, Name, ClientKey, Opts)**
-          Name - list or binary
-          Opts - proplists
-          ClientKey - binary
-          returns: {poolkey, Key}
-                   {duplicate, Key}
+    ```erlang 
+    mx:register(pool, Name, ClientKey)**
+    mx:register(pool, Name, ClientKey, Opts)**
+    ```
+       Name - list or binary
+       Opts - proplists
+       ClientKey - binary
+       
+    returns: `{poolkey, Key} | {duplicate, Key}`
+    
+       Key - binary
 
 * Delete client/channel/pool
-    **mx:unregister(Key)**
+    ```erlang 
+    mx:unregister(Key)
+    ```
 
 * Set online/offline state
-    **mx:online(ClientKey, Pid)**
-    **mx:offline(ClientKey)**
+    ```erlang 
+    mx:online(ClientKey, Pid)
+    mx:offline(ClientKey)
+    ```
 
 * Work with channel/pool
-    **mx:subscribe(Key, Channel)**
-    **mx:unsubscribe(Key, Channel)**
-          Key - binary (ClientKey, ChannelKey, PoolKey)
-          Channel - channel name or channel key
+    ```erlang 
+    mx:subscribe(Key, Channel)
+    mx:unsubscribe(Key, Channel)
+    ```
+       Key - binary (ClientKey, ChannelKey, PoolKey)
+       Channel - channel name or channel key
 
-    **mx:join(Key, Pool)**
-    **mx:leave(key, Pool)**
-          Key - binary (ClientKey, ChannelKey, PoolKey)
-          Pool - pool name or pool key
+    ```erlang 
+    mx:join(Key, Pool)
+    mx:leave(Key, Pool)
+    ```
+       Key - binary (ClientKey, ChannelKey, PoolKey)
+       Pool - pool name or pool key
 
 * Set options for client/channel/pool
-    **mx:set(Key, Opts)**
-          Key - binary (ClientKey, ChannelKey, PoolKey)
-          Opts - proplists
+    ```erlang 
+    mx:set(Key, Opts)
+    ```
+       Key - binary (ClientKey, ChannelKey, PoolKey)
+       Opts - proplists
 
 * Sending message
-  **mx:send(ClientKey, Message)**
-  **mx:send(ChannelKey, Message)**
-  **mx:send(PoolKey, Message)**
+    ```erlang 
+    mx:send(ClientKey, Message)
+    mx:send(ChannelKey, Message)
+    mx:send(PoolKey, Message)
+    ```
 
 * Owning Pool/Channel
-  **mx:own(Key, ClientKey)**
-          Key - binary (ChannelKey, PoolKey)
+    ```erlang 
+    mx:own(Key, ClientKey)
+    ```
+       Key - binary (ChannelKey, PoolKey)
 
-  **mx:abandon(Key, ClientKey)**
-          Key - binary (ChannelKey, PoolKey)
-          orphan Pool/Channel will unregister automaticaly
+    orphan Pool/Channel will unregister automaticaly
+    
+    ```erlang 
+    mx:abandon(Key, ClientKey)
+    ```
+       Key - binary (ChannelKey, PoolKey)
+       
 
 * Clear deferred messages
-    **mx:flush(Key)**
-        Key - binary (ClientKey, ChannelKey, PoolKey)
-        all - truncate the 'deferred' table
+    ```erlang
+    mx:flush(Key)
+    ```
+       Key - binary (ClientKey, ChannelKey, PoolKey)
+       Key = all - truncate the 'deferred' table
 
 * Info
-    **mx:nodes()**
-        show MX cluster nodes
 
-    **mx:info(Key)**
-          Key - binary (ClientKey, ChannelKey, PoolKey)
+    show MX cluster nodes
+    ```erlang
+    mx:nodes()
+    ```
+       
+    show full information about the client
+    ```erlang
+    mx:info(Key)
+    ```
+       Key - binary (ClientKey, ChannelKey, PoolKey)
 
-    **mx:info(Key, Name)**
-          Key - binary (ClientKey, ChannelKey, PoolKey)
-          Name - field name
+    show the only `Name` property from the information list about the client
+    ```erlang
+    mx:info(Key, Name)
+    ```
+       Key - binary (ClientKey, ChannelKey, PoolKey)
+       Name - field name
 
-    **mx:relation(Key)**
-          Key - binary (ChannelKey, PoolKey)
-          shows list of Clients are subscribed/joined to.
+    show the list of Clients are subscribed/joined to.
+    ```erlang
+    mx:relation(Key)
+    ```
+       Key - binary (ChannelKey, PoolKey)
+       
 
 
-### remote use
+### remote usage
 
-use **gen_server:call(MX, Message)**, where the **Message** is one of the listed values below:
+```erlang
+gen_server:call(MX, Message)
+```
+where the `Message` is one of the listed values below:
+
 - {register_client, Client}
 - {register_client, Client, Opts}
 - {register_channel, ChannelName, ClientKey}
