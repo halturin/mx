@@ -27,7 +27,56 @@ application:set_env(mx, master, 'mxnode01@127.0.0.1'),
 application:start(mx).
 ```
 
-now you can call mx:nodes() to get the list of mx cluster nodes.
+Call **mx:nodes()** to get the list of mx cluster nodes.
+
+```erlang
+> (mxnode01@127.0.0.1)2> mx:nodes().
+['mxnode01@127.0.0.1','mxnode02@127.0.0.1']
+```
+
+
+## Examples
+
+```erlang
+% Client has higest priority by default (priority = 1)
+{clientkey, Client1Key} = mx:register(client, "Client1"),
+{clientkey, Client2Key} = mx:register(client, "Client2", [{priority, 8}]),
+{clientkey, Client3Key} = mx:register(client, "Client3", [{async, false}, {defer, true}]),
+{clientkey, Client4Key} = mx:register(client, "Client4"),
+
+% register channel with default priority (5)
+{channelkey, Channel1Key} = mx:register(channel, "Channel1", Client4Key),
+ok = mx:subscribe(Client1Key, Channel1Key),
+% just for example try to subscribe one more time
+{already_subscribed, Client1Key} = mx:subscribe(Client1Key, Channel1Key),
+
+ok = mx:subscribe(Client2Key, Channel1Key),
+ok = mx:subscribe(Client3Key, Channel1Key),
+
+mx:send(Channel1Key, "Hello, Channel1!").
+
+% register pool with default balance method is 'rr' - round robin
+%             default priority (5)
+{poolkey, Pool1Key} = mx:register(pool, "Pool1", Client4Key),
+mx:join(Client1Key, Pool1Key),
+mx:join(Client2Key, Pool1Key),
+mx:join(Client3Key, Pool1Key),
+
+% create lowest priority channel and pool by Client2
+{channelkey, LPCh1} = mx:register(channel, "LP Channel1", Client2Key, [{priority, 10}]),
+{poolkey, LPPl1}    = mx:register(pool, "LP Pool1", Client2Key, [{priority, 10}]),
+
+% create highest priority channel and pool by Client3
+{channelkey, HPCh1} = mx:register(channel, "HP Channel1", Client2Key, [{priority, 1}]),
+{poolkey, HPPl1}    = mx:register(pool, "HP Pool1", Client2Key, [{priority, 1}]),
+
+% high priority pool with 'hash' balance
+{poolkey, HP_Hash_Pl}    = mx:register(pool, "HP Pool (hash)", Client2Key, [{priority, 1}, {balance, hash}]),
+
+% pool with random balance
+{poolkey, Rand_Pl}    = mx:register(pool, "Pool (random) ", Client2Key, [balance, hash}]),
+
+```
 
 ## API
 
@@ -118,8 +167,7 @@ now you can call mx:nodes() to get the list of mx cluster nodes.
 
 ### remote use
 
-use **gen_server:call(MX, Message)**, where
-**MX** is tuple like {mx, 'nodename'} and **Message** is one of listed values below:
+use **gen_server:call(MX, Message)**, where the **Message** is one of the listed values below:
 - {register_client, Client}
 - {register_client, Client, Opts}
 - {register_channel, ChannelName, ClientKey}
@@ -142,51 +190,9 @@ use **gen_server:call(MX, Message)**, where
 - {set, Key, Opts}
 - nodes
 
+```erlang
 > (mxnode02@127.0.0.1)2> gen_server:call({mx, 'mxnode01@127.0.0.1'}, nodes).
 ['mxnode02@127.0.0.1','mxnode01@127.0.0.1']
-
-
-## Examples
-
-```erlang
-% Client has higest priority by default (priority = 1)
-{clientkey, Client1Key} = mx:register(client, "Client1"),
-{clientkey, Client2Key} = mx:register(client, "Client2", [{priority, 8}]),
-{clientkey, Client3Key} = mx:register(client, "Client3", [{async, false}, {defer, true}]),
-{clientkey, Client4Key} = mx:register(client, "Client4"),
-
-% register channel with default priority (5)
-{channelkey, Channel1Key} = mx:register(channel, "Channel1", Client4Key),
-ok = mx:subscribe(Client1Key, Channel1Key),
-% just for example try to subscribe one more time
-{already_subscribed, Client1Key} = mx:subscribe(Client1Key, Channel1Key),
-
-ok = mx:subscribe(Client2Key, Channel1Key),
-ok = mx:subscribe(Client3Key, Channel1Key),
-
-mx:send(Channel1Key, "Hello, Channel1!").
-
-% register pool with default balance method is 'rr' - round robin
-%             default priority (5)
-{poolkey, Pool1Key} = mx:register(pool, "Pool1", Client4Key),
-mx:join(Client1Key, Pool1Key),
-mx:join(Client2Key, Pool1Key),
-mx:join(Client3Key, Pool1Key),
-
-% create lowest priority channel and pool by Client2
-{channelkey, LPCh1} = mx:register(channel, "LP Channel1", Client2Key, [{priority, 10}]),
-{poolkey, LPPl1}    = mx:register(pool, "LP Pool1", Client2Key, [{priority, 10}]),
-
-% create highest priority channel and pool by Client3
-{channelkey, HPCh1} = mx:register(channel, "HP Channel1", Client2Key, [{priority, 1}]),
-{poolkey, HPPl1}    = mx:register(pool, "HP Pool1", Client2Key, [{priority, 1}]),
-
-% high priority pool with 'hash' balance
-{poolkey, HP_Hash_Pl}    = mx:register(pool, "HP Pool (hash)", Client2Key, [{priority, 1}, {balance, hash}]),
-
-% pool with random balance
-{poolkey, Rand_Pl}    = mx:register(pool, "Pool (random) ", Client2Key, [balance, hash}]),
-
 ```
 
 ## Testing
