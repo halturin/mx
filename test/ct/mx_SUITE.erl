@@ -22,10 +22,9 @@
 -module(mx_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
 -compile(export_all).
-
--export([test1/1]).
 
 %%--------------------------------------------------------------------
 %% COMMON TEST CALLBACK FUNCTIONS
@@ -44,7 +43,7 @@
 %% default data values, not perform any other operations.
 %%--------------------------------------------------------------------
 suite() ->
-    [{example, "Value"}].
+    [{timetrap,{seconds,30}}].
 
 %%--------------------------------------------------------------------
 %% Function: init_per_suite(Config0) ->
@@ -61,7 +60,15 @@ suite() ->
 %% variable, but should NOT alter/remove any existing entries.
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
-    application:start(mx),
+    % application:load(lager),
+    % application:set_env(lager, handlers,
+    %     [
+    %         {lager_console_backend, info},
+    %         {lager_file_backend, [{file, "/tmp/mx.run.log"}, {level, debug}]}
+    %     ]
+    % ),
+    % application:ensure_all_started(lager),
+    % application:ensure_all_started(mx),
     Config.
 
 %%--------------------------------------------------------------------
@@ -73,6 +80,7 @@ init_per_suite(Config) ->
 %% Description: Cleanup after the suite.
 %%--------------------------------------------------------------------
 end_per_suite(_Config) ->
+    % application:stop(mx),
     ok.
 
 %%--------------------------------------------------------------------
@@ -162,7 +170,30 @@ end_per_testcase(_TestCase, _Config) ->
 %% Description: Returns a list of test case group definitions.
 %%--------------------------------------------------------------------
 groups() ->
-    [].
+    [
+    {channel,[sequence], [
+        channel_test_Clients_1_Messages_1
+        % channel_test_Clients_1_Messages_1000
+        % channel_test_Clients_1000_Messages_1
+        % channel_test_Clients_1000_Messages_10
+        ]},
+
+    {channel,[parallel], [
+        channel_test_Clients_1000_Messages_1,
+        channel_test_Clients_1000_Messages_1,
+        channel_test_Clients_1000_Messages_1,
+        channel_test_Clients_1000_Messages_1,
+        channel_test_Clients_1000_Messages_1
+        % channel_test_Clients_1_Messages_1000
+        % channel_test_Clients_1000_Messages_1
+        % channel_test_Clients_1000_Messages_10
+        ]},
+    {pool, [sequence],[
+        pool_test_1_1
+        ]}
+    ].
+
+
 
 %%--------------------------------------------------------------------
 %% Function: all() -> GroupsAndTestCases | {skip,Reason}
@@ -180,30 +211,146 @@ groups() ->
 %%--------------------------------------------------------------------
 
 all() ->
-    [test1].
+    [
+    {group, channel}, % pub/sub
+    {group, pool}     % workers pool
+    ].
 
-test1(_Config) ->
-    % mnesia:dirty_select(mx_table_client, [{'_',[],['$_']}]).
-    % mnesia:dirty_select(mx_table_defer, [{'_',[],['$_']}]).
 
-    mx:register(client, "Client1"),
-    mx:register(client, "Client2"),
-    mx:register(client, "Client3"),
-    mx:register(client, "Client4"),
+-define(MX(A,B),        gen_server:call({mx, 'mxnode01@127.0.0.1'}, {A,B})).
+-define(MX(A,B,C),      gen_server:call({mx, 'mxnode01@127.0.0.1'}, {A,B,C})).
+-define(MX(A,B,C,D),      gen_server:call({mx, 'mxnode01@127.0.0.1'}, {A,B,C,D})).
 
-    mx:register(channel, "Channel1", <<42,95,236,108,64,253,36,90,36,60,50,179,219,73,1,61,69>>),
+client(ID, ChannelKey, N, DonePid) ->
+    Pid = erlang:spawn_link(fun() ->
+            ClientName = lists:flatten(io_lib:format("client-~p-~p", [ID,self()])),
+            ct:print("registering: ~p", [ClientName]),
+            case ?MX(register_client, ClientName, [{monitor, true}]) of
+                {duplicate, ClientKey} ->
+                    ?MX(set, ClientKey, [{handler, self()}, {monitor, true}]);
+                {clientkey, ClientKey} ->
+                    pass
+            end,
+            ?MX(subscribe,ClientKey, ChannelKey),
+            Loop = fun Loop(I) when N > I ->
+                        receive
+                            {'$gen_call', ReplyTo, _M} ->
+                                gen_server:reply(ReplyTo, ok),
+                                Loop(I);
+                            {'$gen_cast', _M} ->
+                                Loop(I);
+                            {mx, M} ->
+                                ct:print("GOT MX MESSAGE: (~p): ~p", [self(), M]),
+                                Loop(I+1);
+                            stop ->
+                                ok;
+                            M ->
+                                ct:print("GOT UNKNOWN MESSAGE: (~p): ~p", [self(), M]),
+                                Loop(I)
+                        end;
 
-    mx:subscribe(<<42,47,231,226,247,215,105,46,217,181,173,247,93,206,248,15,209>>, "Channel1"),
-    mx:subscribe(<<42,150,205,12,62,219,183,158,157,112,8,45,243,123,103,79,105>>, "Channel1"),
-    mx:subscribe(<<42,215,87,81,75,153,148,193,185,32,38,111,156,162,183,64,229>>, "Channel1"),
+                    Loop(_I) ->
+                        DonePid ! {done, ID}
 
-    mx:register(pool, "Pool1", <<42,95,236,108,64,253,36,90,36,60,50,179,219,73,1,61,69>>),
-    mx:join(<<42,47,231,226,247,215,105,46,217,181,173,247,93,206,248,15,209>>, "Pool1"),
-    mx:join(<<42,150,205,12,62,219,183,158,157,112,8,45,243,123,103,79,105>>, "Pool1"),
-    mx:join(<<42,215,87,81,75,153,148,193,185,32,38,111,156,162,183,64,229>>, "Pool1"),
+            end,
+            DonePid ! {ready, ID},
+            Loop(0)
+       end),
+    Pid.
 
-    mx:send(<<42,95,236,108,64,253,36,90,36,60,50,179,219,73,1,61,69>>, "hi body"),
-    mx:send(<<35,110,121,48,217,228,92,240,133,25,235,94,163,50,133,167,55>>, "hi channel"),
-    mx:send(<<64,92,61,224,106,0,184,142,80,34,47,10,105,152,188,54,23>>, "hi pool"),
 
+channel_test(NumClients, NMessages) ->
+
+
+    Finish = self(),
+    DonePid = erlang:spawn_link(fun() ->
+        F = fun Done(N,N) when N == NumClients->
+                    Finish ! finish;
+                Done(N,NDone) when N == NumClients, N > NDone ->
+                    receive
+                        {done, _ID} ->
+                            Done(N, NDone+1)
+                    after 25000 ->
+                        Finish ! timeout_done
+                    end;
+                Done(N,_) ->
+                    receive
+                        {ready, _ID} when N == NumClients -1 ->
+                            Finish ! ready,
+                            Done(NumClients, 0);
+                        {ready, _ID} ->
+                            Done(N+1, 0)
+                    after 5000 ->
+                        Finish ! timeout_ready
+                    end
+        end,
+        F(0,0)
+    end),
+
+    % create publisher
+    ChannelName = lists:flatten(io_lib:format("Channel_test_~p", [self()])),
+    PublisherName = lists:flatten(io_lib:format("Publisher_~p", [self()])),
+    case ?MX(register_client, PublisherName, [{monitor, true}]) of
+        {duplicate, PublisherClientKey} ->
+            ?MX(set, PublisherClientKey, [{handler, self()}, {monitor, true}]);
+        {clientkey, PublisherClientKey} ->
+            pass
+    end,
+    {_, PublisherChannelKey} = ?MX(register_channel, ChannelName, PublisherClientKey, [{own, true}]),
+
+    % create subscribers
+
+    _Clients = [client(ID, ChannelName, NMessages, DonePid) || ID <- lists:seq(1,NumClients)],
+    receive
+        ready ->
+            [?MX(send, PublisherChannelKey, "hello-"++integer_to_list(NM)) || NM <- lists:seq(1,NMessages)]
+    end,
+
+    ?assert(receive finish -> true; X -> X after 26000 -> timeout_finish end),
     ok.
+
+channel_test_Clients_1_Messages_1(_X) ->
+    % NumClients = 1, % NMessages = 1,
+    channel_test(1, 1),
+    ok.
+
+channel_test_Clients_1_Messages_1000(_X) ->
+    channel_test(1, 1000),
+    ok.
+
+channel_test_Clients_1000_Messages_1(_X) ->
+    channel_test(1000, 1),
+    ok.
+
+channel_test_Clients_1000_Messages_10(_X) ->
+    channel_test(1000, 10),
+    ok.
+
+pool_test_1_1(_X) ->
+    ok.
+
+% test1(_Config) ->
+%     % mnesia:dirty_select(mx_table_client, [{'_',[],['$_']}]).
+%     % mnesia:dirty_select(mx_table_defer, [{'_',[],['$_']}]).
+
+%     mx:register(client, "Client1"),
+%     mx:register(client, "Client2"),
+%     mx:register(client, "Client3"),
+%     mx:register(client, "Client4"),
+
+%     mx:register(channel, "Channel1", <<42,95,236,108,64,253,36,90,36,60,50,179,219,73,1,61,69>>),
+
+%     mx:subscribe(<<42,47,231,226,247,215,105,46,217,181,173,247,93,206,248,15,209>>, "Channel1"),
+%     mx:subscribe(<<42,150,205,12,62,219,183,158,157,112,8,45,243,123,103,79,105>>, "Channel1"),
+%     mx:subscribe(<<42,215,87,81,75,153,148,193,185,32,38,111,156,162,183,64,229>>, "Channel1"),
+
+%     mx:register(pool, "Pool1", <<42,95,236,108,64,253,36,90,36,60,50,179,219,73,1,61,69>>),
+%     mx:join(<<42,47,231,226,247,215,105,46,217,181,173,247,93,206,248,15,209>>, "Pool1"),
+%     mx:join(<<42,150,205,12,62,219,183,158,157,112,8,45,243,123,103,79,105>>, "Pool1"),
+%     mx:join(<<42,215,87,81,75,153,148,193,185,32,38,111,156,162,183,64,229>>, "Pool1"),
+
+%     mx:send(<<42,95,236,108,64,253,36,90,36,60,50,179,219,73,1,61,69>>, "hi body"),
+%     mx:send(<<35,110,121,48,217,228,92,240,133,25,235,94,163,50,133,167,55>>, "hi channel"),
+%     mx:send(<<64,92,61,224,106,0,184,142,80,34,47,10,105,152,188,54,23>>, "hi pool"),
+
+%     ok.

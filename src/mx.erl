@@ -563,12 +563,12 @@ monitor_node(Node, ClientKey) ->
     mnesia:transaction(fun() ->
         case mnesia:read(?MXKV, {monitor, erlang:node(), Node}, read) of
             [] ->
-                ?DBG("monitor node ~p", [Node]),
+                % ?DBG("monitor node ~p", [Node]),
                 erlang:monitor_node(Node, true),
                 KV = #?MXKV{key = {monitor, erlang:node(), Node}, value = [ClientKey]},
                 mnesia:write(KV);
             [#?MXKV{key = K, value = V}] ->
-                ?DBG("monitor node: already"),
+                % ?DBG("monitor node: already"),
                 case lists:member(ClientKey, V) of
                     false ->
                         mnesia:write(#?MXKV{key = K, value = [ClientKey | V]});

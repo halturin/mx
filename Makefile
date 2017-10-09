@@ -12,10 +12,10 @@ compile: clean
 	@$(REBAR) compile
 
 test: compile
-	@$(REBAR) as test eunit skip_deps=true
+	@$(REBAR) as test eunit
 
 ct:
-	@$(REBAR) skip_deps=true ct
+	@$(REBAR) ct --setcookie devcook --name mxtest001@127.0.0.1
 
 clean:
 	@$(REBAR) clean
