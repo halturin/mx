@@ -246,7 +246,7 @@ where the `Message` is one of the listed values below:
 
 There are only common tests (CT) are implemented with some limited set of cases
 
-### Direct tests (pub/sub).
+### Direct sending tests.
 Sequentualy running:
 
   * [x] 1 reciever - 1 message
