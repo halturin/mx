@@ -171,22 +171,47 @@ end_per_testcase(_TestCase, _Config) ->
 %%--------------------------------------------------------------------
 groups() ->
     [
+
+    {direct,[sequence], [
+        direct_test_Recievers_1_Messages_1
+        % direct_test_Recievers_1_Messages_1000,
+        % direct_test_Recievers_1000_Messages_1,
+        % direct_test_Recievers_1000_Messages_100
+        ]},
+
+    {direct,[parallel], [
+
+        direct_test_Recievers_1_Messages_1000
+        % direct_test_Recievers_1000_Messages_1,
+        % direct_test_Recievers_1_Messages_1000,
+        % direct_test_Recievers_1000_Messages_1,
+        % direct_test_Recievers_1_Messages_1000,
+        % direct_test_Recievers_1000_Messages_1
+
+        ]},
+
+
     {channel,[sequence], [
-        channel_test_Clients_1_Messages_1
-        % channel_test_Clients_1_Messages_1000
-        % channel_test_Clients_1000_Messages_1
-        % channel_test_Clients_1000_Messages_10
+        channel_test_Subscribers_1_Messages_1
+        % channel_test_Subscribers_1_Messages_1000
+        % channel_test_Subscribers_1000_Messages_1
+        % channel_test_Subscribers_1000_Messages_10
         ]},
 
     {channel,[parallel], [
-        channel_test_Clients_1000_Messages_1,
-        channel_test_Clients_1000_Messages_1,
-        channel_test_Clients_1000_Messages_1,
-        channel_test_Clients_1000_Messages_1,
-        channel_test_Clients_1000_Messages_1
-        % channel_test_Clients_1_Messages_1000
-        % channel_test_Clients_1000_Messages_1
-        % channel_test_Clients_1000_Messages_10
+    % channel_test_Subscribers_1_Messages_1000,
+    % channel_test_Subscribers_1_Messages_1000,
+    % channel_test_Subscribers_1_Messages_1000,
+    % channel_test_Subscribers_1_Messages_1000
+        % channel_test_Subscribers_1000_Messages_1,
+        % channel_test_Subscribers_1000_Messages_1,
+        % channel_test_Subscribers_1000_Messages_1,
+        % channel_test_Subscribers_1000_Messages_1,
+        % channel_test_Subscribers_1000_Messages_1
+
+        % channel_test_Subscribers_1_Messages_1000
+        % channel_test_Subscribers_1000_Messages_1
+        % channel_test_Subscribers_1000_Messages_10
         ]},
     {pool, [sequence],[
         pool_test_1_1
@@ -212,6 +237,7 @@ groups() ->
 
 all() ->
     [
+    {group, direct},
     {group, channel}, % pub/sub
     {group, pool}     % workers pool
     ].
@@ -221,7 +247,8 @@ all() ->
 -define(MX(A,B,C),      gen_server:call({mx, 'mxnode01@127.0.0.1'}, {A,B,C})).
 -define(MX(A,B,C,D),      gen_server:call({mx, 'mxnode01@127.0.0.1'}, {A,B,C,D})).
 
-client(ID, ChannelKey, N, DonePid) ->
+client(ID, KeyTo, N, DonePid) ->
+    Self = self(),
     Pid = erlang:spawn_link(fun() ->
             ClientName = lists:flatten(io_lib:format("client-~p-~p", [ID,self()])),
             ct:print("registering: ~p", [ClientName]),
@@ -231,7 +258,16 @@ client(ID, ChannelKey, N, DonePid) ->
                 {clientkey, ClientKey} ->
                     pass
             end,
-            ?MX(subscribe,ClientKey, ChannelKey),
+            Self ! ClientKey,
+            case KeyTo of
+                <<$#, _/binary>> = Key ->
+                    ?MX(subscribe,ClientKey, Key);
+                <<$@, _/binary>> = Key ->
+                    ?MX(join,ClientKey, Key);
+                _ ->
+                    ct:print("skip the key!"),
+                    pass
+            end,
             Loop = fun Loop(I) when N > I ->
                         receive
                             {'$gen_call', ReplyTo, _M} ->
@@ -256,15 +292,18 @@ client(ID, ChannelKey, N, DonePid) ->
             DonePid ! {ready, ID},
             Loop(0)
        end),
-    Pid.
+
+    receive
+        ClientKey ->
+            {Pid, ClientKey}
+    end.
 
 
-channel_test(NumClients, NMessages) ->
-
-
+handler_responses(NumClients) ->
     Finish = self(),
-    DonePid = erlang:spawn_link(fun() ->
+    erlang:spawn_link(fun() ->
         F = fun Done(N,N) when N == NumClients->
+                    ct:print("DONE!"),
                     Finish ! finish;
                 Done(N,NDone) when N == NumClients, N > NDone ->
                     receive
@@ -285,7 +324,24 @@ channel_test(NumClients, NMessages) ->
                     end
         end,
         F(0,0)
-    end),
+    end).
+
+
+direct_test(NumClients, NMessages) ->
+    DonePid = handler_responses(NumClients),
+    Clients = [client(ID, none, NMessages, DonePid) || ID <- lists:seq(1,NumClients)],
+
+    receive
+        ready ->
+            [[?MX(send, Key, "hello-"++integer_to_list(N)) || N <- lists:seq(1,NMessages)] || {_, Key} <- Clients]
+    end,
+
+    ?assert(receive finish -> true; X -> X after 26000 -> timeout_finish end),
+    ok.
+
+channel_test(NumClients, NMessages) ->
+
+    DonePid = handler_responses(NumClients),
 
     % create publisher
     ChannelName = lists:flatten(io_lib:format("Channel_test_~p", [self()])),
@@ -300,7 +356,7 @@ channel_test(NumClients, NMessages) ->
 
     % create subscribers
 
-    _Clients = [client(ID, ChannelName, NMessages, DonePid) || ID <- lists:seq(1,NumClients)],
+    _Clients = [client(ID, PublisherChannelKey, NMessages, DonePid) || ID <- lists:seq(1,NumClients)],
     receive
         ready ->
             [?MX(send, PublisherChannelKey, "hello-"++integer_to_list(NM)) || NM <- lists:seq(1,NMessages)]
@@ -309,20 +365,32 @@ channel_test(NumClients, NMessages) ->
     ?assert(receive finish -> true; X -> X after 26000 -> timeout_finish end),
     ok.
 
-channel_test_Clients_1_Messages_1(_X) ->
+direct_test_Recievers_1_Messages_1(_X) ->
+    direct_test(1,1).
+
+direct_test_Recievers_1_Messages_1000(_X) ->
+    direct_test(1,1000).
+
+direct_test_Recievers_1000_Messages_1(_X) ->
+    direct_test(1000,1).
+
+direct_test_Recievers_1000_Messages_100(_X) ->
+    direct_test(1000,100).
+
+channel_test_Subscribers_1_Messages_1(_X) ->
     % NumClients = 1, % NMessages = 1,
     channel_test(1, 1),
     ok.
 
-channel_test_Clients_1_Messages_1000(_X) ->
-    channel_test(1, 1000),
+channel_test_Subscribers_1_Messages_1000(_X) ->
+    channel_test(1, 20000),
     ok.
 
-channel_test_Clients_1000_Messages_1(_X) ->
+channel_test_Subscribers_1000_Messages_1(_X) ->
     channel_test(1000, 1),
     ok.
 
-channel_test_Clients_1000_Messages_10(_X) ->
+channel_test_Subscribers_1000_Messages_10(_X) ->
     channel_test(1000, 10),
     ok.
 

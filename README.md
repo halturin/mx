@@ -246,31 +246,46 @@ where the `Message` is one of the listed values below:
 
 There are only common tests (CT) are implemented with some limited set of cases
 
+### Direct tests (pub/sub).
+Sequentualy running:
+
+  * [x] 1 reciever - 1 message
+  * [x] 1 reciever - 1000 messages
+  * [x] 1000 recievers - 1 messages
+  * [x] 1000 recievers - 100 messages
+
+Parallel:
+
+  * [x] 1 reciever - 1000 messages (3 processes)
+  * [x] 1000 recievers - 1 messages (3 processes)
+
+
 ### Channel tests (pub/sub).
 
 Sequentualy running:
 
-  * [x] 1 client (subscriber) recieves 1 messages
-  * [x] 1 client - 1000 messages
-  * [x] 1000 clients - 1 messages
-  * [x] 1000 clients - 10 messages
+  * [x] 1 subscriber (subscriber) recieves 1 messages
+  * [x] 1 subscriber - 1000 messages
+  * [x] 1000 subscribers - 1 messages
+  * [x] 1000 subscribers - 10 messages
 
-Parallel: 
-  * [ ] 1000 clients - 10 messages (10 processes)
+Parallel:
+
+  * [ ] 1000 subscribers - 10 messages (10 processes)
 
 Priority delivering:
-  * 1 client recieves 1000 messages with 10 different priorities: 
+  * 1 subscriber recieves 1000 messages with 10 different priorities:
     * [ ] 100 messages with priority 1
     * [ ] 100 messages with priority 2
     * [ ] ...
     * [ ] 100 messages with priority 10
-    
+
 
 ### Pool tests (worker queue)
 
 Sequentualy running:
 
-  * [ ] 1 client (sender) sends 1 messages to 1 worker
+  * [ ] 1 client sends 1 messages to 1 worker
   * [ ] 1 client - 1000 messages - 2 workers (round robin)
   * [ ] 1 client - 1000 messages - 2 workers (hash)
   * [ ] 1 client - 1000 messages - 2 workers (random)
