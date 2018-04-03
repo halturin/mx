@@ -231,17 +231,19 @@ wait(N) ->
     end.
 
 create_table(T, A) ->
-
+    mnesia:delete_table(T),
     case mnesia:create_table(T, A) of
         {atomic, ok}                    -> ok;
-        {aborted, {already_exists, _}}  -> ok;
+        % {aborted, {already_exists, _}}  -> ok;
         Error                           -> Error
     end.
 
 copy_table(T) ->
+    mnesia:delete_table(T),
     case mnesia:add_table_copy(T, node(), ram_copies) of
         {atomic, ok}                        -> ok;
-        {aborted, {already_exists, _, _}}   -> ok;
+        % {aborted, {already_exists, _, _}}   ->
+        ok;
         Error                               -> Error
     end.
 
