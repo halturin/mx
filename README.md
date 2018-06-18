@@ -13,27 +13,55 @@ Universal OTP message broker features:
     - client has 'offline' state and the 'defer' option is set to 'true'
 * 'async' Client option allows you control the delivery process. Default value of this option is 'true'.
 
+## Install
+For **dev** purposes simple run:
+```
+git clone https://github.com/halturin/mx && cd mx && make compile && echo "MX is installed in $(pwd)"
+```
+For **production** use:
+```
+% rebar.config -- add mx in deps section
+{deps, [
+       {mx, {git, "git://github.com/halturin/mx.git", {branch, "master"}}}
+]}.
+%% and add mx to the relx section
+{relx, [{release, {your_rel, "0.0.1"},
+         [...,
+          mx]}
+]}.
+```
+
+## Run
+```
+make run
+```
+
 ## Distributed mode
 
-Set via environment value of **'master'** to run it in slave mode.
+In first terminal window run:
 ```erlang
-% on mxnode01@127.0.0.1
-application:start(mx).
+make demo_run node_name='mxnode01@127.0.0.1'
+
+(mxnode01@127.0.0.1)1> application:start(mx).
 ```
+
+In second terminal window:
+
 ```erlang
-% on mxnode02@127.0.0.1
-application:load(mx),
-application:set_env(mx, master, 'mxnode01@127.0.0.1'),
-application:start(mx).
+make demo_run node_name='mxnode02@127.0.0.1'
+
+(mxnode02@127.0.0.1)1> application:load(mx).
+%% Set via environment value of **'master'** to run it in slave mode.
+(mxnode02@127.0.0.1)2> application:set_env(mx, master, 'mxnode01@127.0.0.1').
+(mxnode02@127.0.0.1)3> application:start(mx).
 ```
 
 Call **mx:nodes()** to get the list of mx cluster nodes.
 
 ```erlang
-> (mxnode01@127.0.0.1)2> mx:nodes().
+(mxnode01@127.0.0.1)2> mx:nodes().
 ['mxnode01@127.0.0.1','mxnode02@127.0.0.1']
 ```
-
 
 ## Examples
 
@@ -84,61 +112,61 @@ mx:join(Client3Key, Pool1Key),
 
 * Create client/channel/pool
 
-    ```erlang 
+    ```erlang
     mx:register(client, Name)
     mx:register(client, Name, Opts)
     ```
        Name - list or binary
        Opts - proplists
-    
+
     returns: `{clientkey, Key} | {duplicate, Key}`
-    
+
        Key - binary
 
-    ```erlang 
+    ```erlang
     mx:register(channel, Name, ClientKey)
     mx:register(channel, Name, ClientKey, Opts)
     ```
        Name - list or binary
        Opts - proplists
        ClientKey - binary
-       
+
     returns: `{channelkey, Key} | {duplicate, Key}`
-    
+
        Key - binary
 
-    ```erlang 
+    ```erlang
     mx:register(pool, Name, ClientKey)**
     mx:register(pool, Name, ClientKey, Opts)**
     ```
        Name - list or binary
        Opts - proplists
        ClientKey - binary
-       
+
     returns: `{poolkey, Key} | {duplicate, Key}`
-    
+
        Key - binary
 
 * Delete client/channel/pool
-    ```erlang 
+    ```erlang
     mx:unregister(Key)
     ```
 
 * Set online/offline state
-    ```erlang 
+    ```erlang
     mx:online(ClientKey, Pid)
     mx:offline(ClientKey)
     ```
 
 * Work with channel/pool
-    ```erlang 
+    ```erlang
     mx:subscribe(Key, Channel)
     mx:unsubscribe(Key, Channel)
     ```
        Key - binary (ClientKey, ChannelKey, PoolKey)
        Channel - channel name or channel key
 
-    ```erlang 
+    ```erlang
     mx:join(Key, Pool)
     mx:leave(Key, Pool)
     ```
@@ -146,32 +174,32 @@ mx:join(Client3Key, Pool1Key),
        Pool - pool name or pool key
 
 * Set options for client/channel/pool
-    ```erlang 
+    ```erlang
     mx:set(Key, Opts)
     ```
        Key - binary (ClientKey, ChannelKey, PoolKey)
        Opts - proplists
 
 * Sending message
-    ```erlang 
+    ```erlang
     mx:send(ClientKey, Message)
     mx:send(ChannelKey, Message)
     mx:send(PoolKey, Message)
     ```
 
 * Owning Pool/Channel
-    ```erlang 
+    ```erlang
     mx:own(Key, ClientKey)
     ```
        Key - binary (ChannelKey, PoolKey)
 
     orphan Pool/Channel will unregister automaticaly
-    
-    ```erlang 
+
+    ```erlang
     mx:abandon(Key, ClientKey)
     ```
        Key - binary (ChannelKey, PoolKey)
-       
+
 
 * Clear deferred messages
     ```erlang
@@ -180,13 +208,18 @@ mx:join(Client3Key, Pool1Key),
        Key - binary (ClientKey, ChannelKey, PoolKey)
        Key = all - truncate the 'deferred' table
 
+* Clear all MX tables
+    ```erlang
+    mx:clear_all_tables()
+    ```
+
 * Info
 
     show MX cluster nodes
     ```erlang
     mx:nodes()
     ```
-       
+
     show full information about the client
     ```erlang
     mx:info(Key)
@@ -205,7 +238,6 @@ mx:join(Client3Key, Pool1Key),
     mx:relation(Key)
     ```
        Key - binary (ChannelKey, PoolKey)
-       
 
 
 ### remote usage
@@ -236,6 +268,7 @@ where the `Message` is one of the listed values below:
 - `{relation, Key}`
 - `{set, Key, Opts}`
 - `nodes`
+- `clear_all_tables`
 
 ```erlang
 > (mxnode02@127.0.0.1)2> gen_server:call({mx, 'mxnode01@127.0.0.1'}, nodes).
@@ -307,5 +340,3 @@ $ make run
 ```shell
 $ make ct
 ```
-
-

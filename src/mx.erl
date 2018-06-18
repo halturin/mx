@@ -53,7 +53,8 @@
          own/2,
          abandon/2,
          flush/1,
-         nodes/0
+         nodes/0,
+         clear_all_tables/0
         ]).
 
 %% records
@@ -242,6 +243,9 @@ flush(Key) ->
 
 nodes() ->
     mx_mnesia:nodes().
+
+clear_all_tables() ->
+    mx_mnesia:clear_all_tables().
 
 %%--------------------------------------------------------------------
 %% @doc
