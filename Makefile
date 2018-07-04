@@ -38,3 +38,8 @@ release: compile
 
 run: rel
 	$(REBAR) run
+
+demo_run:
+	# only for demonstration purposes
+	erl -name $(node_name) -pa _build/default/lib/mx/ebin _build/default/lib/gproc/ebin _build/default/lib/lager/ebin _build/default/lib/goldrush/ebin -eval "lists:map(fun(App) -> application:start(App) end, [gproc, syntax_tools, compiler, goldrush, lager])"
+

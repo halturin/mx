@@ -32,7 +32,8 @@
          terminate/2,
          code_change/3]).
 
--export([nodes/0]).
+-export([nodes/0,
+         clear_all_tables/0]).
 
 -include_lib("include/mx.hrl").
 -include_lib("include/log.hrl").
@@ -259,3 +260,6 @@ clear_table_kv() ->
         Keys ->
             [clear_table_kv(node(), KV) || KV <- Keys]
     end.
+
+clear_all_tables() ->
+    [mnesia:clear_table(Table) || {Table, _Attts} <- ?MXTABLES].
