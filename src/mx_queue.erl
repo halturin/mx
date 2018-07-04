@@ -30,9 +30,9 @@
 -record(mxq,{queue              = queue:new(),
              name               :: non_neg_integer(),
              length             = 0 :: non_neg_integer(), %% current len
-             length_limit       = ?MXQUEUE_LENGTH_LIMIT,
-             threshold_low      = ?MXQUEUE_LOW_THRESHOLD,
-             threshold_high     = ?MXQUEUE_HIGH_THRESHOLD,
+             length_limit       :: pos_integer(),
+             threshold_low      :: float(),
+             threshold_high     :: float(),
              total              = 0, % total messages
              alarm}).
 
@@ -44,6 +44,9 @@
 new(QueueName) when is_integer(QueueName) ->
     #mxq{
         name            = QueueName,
+        length_limit    = application:get_env(mx, queue_length_limit,   10000),
+        threshold_low   = application:get_env(mx, queue_low_threshold,  0.6),
+        threshold_high  = application:get_env(mx, queue_high_threshold, 0.8),
         alarm           = alarm()
     };
 new(_) ->
