@@ -31,6 +31,17 @@ For **production** use:
 ]}.
 ```
 
+You can specifying a **queue limits** in sys.config:
+```
+[
+    {mx, [
+       {queue_length_limit, 100000},
+       {queue_low_threshold, 0.6},   % 60%
+       {queue_high_threshold, 0.8}   % 80%
+    ]}
+]
+```
+
 ## Run
 ```
 make run
