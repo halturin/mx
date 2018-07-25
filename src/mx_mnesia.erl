@@ -155,7 +155,7 @@ handle_cast({master, Master}, State) ->
             ok
     end,
 
-    [copy_table(T) || T <- ?MXTABLES],
+    [copy_table(Table) || {Table, _Attrs} <- ?MXTABLES],
     mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
 
     clear_all_tables(),
@@ -244,7 +244,9 @@ copy_table(T) ->
     case mnesia:add_table_copy(T, node(), ram_copies) of
         {atomic, ok}                        -> ok;
         % {aborted, {already_exists, _, _}}   -> ok;
-        Error                               -> Error
+        Error                               ->
+            ?ERR("Got error on copy table: ~p", [Error]),
+            Error
     end.
 
 clear_all_tables() ->
