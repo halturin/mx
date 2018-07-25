@@ -69,6 +69,12 @@ start_link() ->
 %%--------------------------------------------------------------------
 init([]) ->
     process_flag(trap_exit, true),
+
+    {ok, MnesiaBaseDir} = application:get_env(mx, mnesia_base_dir),
+    NodeDir = MnesiaBaseDir ++ node(),
+    ok = filelib:ensure_dir(NodeDir),
+    application:set_env(mnesia, dir, NodeDir),
+
     case application:get_env(mx, master, none) of
         none ->
             % run as master
@@ -232,18 +238,18 @@ wait(N) ->
     end.
 
 create_table(T, A) ->
-    mnesia:delete_table(T),
     case mnesia:create_table(T, A) of
         {atomic, ok}                    -> ok;
-        % {aborted, {already_exists, _}}  -> ok;
-        Error                           -> Error
+        {aborted, {already_exists, _}}  -> ok;
+        Error                           ->
+            ?ERR("Got error on create table: ~p", [Error]),
+            Error
     end.
 
 copy_table(T) ->
-    mnesia:delete_table(T),
     case mnesia:add_table_copy(T, node(), ram_copies) of
         {atomic, ok}                        -> ok;
-        % {aborted, {already_exists, _, _}}   -> ok;
+        {aborted, {already_exists, _, _}}   -> ok;
         Error                               ->
             ?ERR("Got error on copy table: ~p", [Error]),
             Error
