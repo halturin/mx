@@ -76,7 +76,7 @@ init([]) ->
     application:set_env(mnesia, dir, NodeDir),
 
     case application:get_env(mx, master, none) of
-        none ->
+        X when X == ""; X == none ->
             % run as master
             gen_server:cast(self(), master);
 

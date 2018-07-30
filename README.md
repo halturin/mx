@@ -42,6 +42,11 @@ You can specifying a **queue limits** in sys.config:
 ]
 ```
 
+And create dir **/usr/local/var/lib/mx/mnesia/** with right permissions. So, mnesia data will bi in:
+```
+/usr/local/var/lib/mx/mnesia/mxnode01@127.0.0.1  %% node name
+```
+
 ## Run
 ```
 make run
