@@ -484,10 +484,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 wait_for_mnesia(T) when T > 0 ->
-    case gen_server:call(mx_mnesia, status) of
+    case mx_mnesia:status() of
         running ->
             ok;
-        X ->
+        starting = X ->
             ?ERR("waiting ~p~n", [X]),
             timer:sleep(100),
             wait_for_mnesia(T - 100)

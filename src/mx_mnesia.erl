@@ -33,15 +33,25 @@
          code_change/3]).
 
 -export([nodes/0,
+         status/0,
          clear_all_tables/0]).
 
 -include_lib("include/mx.hrl").
 -include_lib("include/log.hrl").
 
--record(state, {status}).
+-record(state, {
+          status   :: starting | running
+         }).
+
+%%%===================================================================
+%%% API
+%%%===================================================================
 
 nodes() ->
     gen_server:call(?MODULE, nodes).
+
+status() ->
+    gen_server:call(?MODULE, status).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -77,19 +87,12 @@ init([]) ->
 
     case application:get_env(mx, master, none) of
         X when X == ""; X == none ->
-            % run as master
-            gen_server:cast(self(), master);
-
-        Node when is_atom(Node) ->
-            % run as slave
-            gen_server:cast(self(), {master, Node});
-
-        Node when is_list(Node) ->
-            % run as slave
-            gen_server:cast(self(), {master, list_to_atom(Node)})
+            run_as_master();
+        Master when is_atom(Master); is_list(Master) ->
+            run_as_slave(Master)
     end,
 
-    {ok, #state{status = starting}}.
+    {ok, #state{status = running}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -126,49 +129,6 @@ handle_call(Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(master, State) ->
-    ?DBG("Run mnesia as MASTER on [~p]", [node()]),
-    case mnesia:create_schema([node()]) of
-        ok ->
-            ok;
-        {error, {_, {already_exists, _}}} ->
-            ok;
-        {error, E} ->
-            ?ERR("failed to create Mnesia schema: ~p", [E])
-    end,
-    ok = mnesia:start(),
-
-    [create_table(T,A) || {T,A} <- ?MXTABLES],
-    mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
-
-    clear_all_tables(),
-
-    {noreply, State#state{status = running}};
-
-
-handle_cast({master, Master}, State) ->
-    ?DBG("Run mnesia as SLAVE on [~p] and link to the master [~p]", [node(), Master]),
-    ok = stop(),
-    ok = mnesia:delete_schema([node()]),
-    ok = mnesia:start(),
-
-    case mnesia:change_config(extra_db_nodes, [Master]) of
-        [] ->
-            throw({error, "failed to start Mnesia in slave mode"});
-        {ok, Cluster} ->
-            % FIXME.
-            ?DBG("Mnesia cluster: ~p", [Cluster]),
-            ok
-    end,
-
-    [copy_table(Table) || {Table, _Attrs} <- ?MXTABLES],
-    mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
-
-    clear_all_tables(),
-
-    {noreply, State#state{status = running}};
-
-
 handle_cast(Msg, State) ->
     ?ERR("unhandled cast: ~p", [Msg]),
     {noreply, State}.
@@ -216,6 +176,45 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+run_as_master() ->
+    ?DBG("Run mnesia as MASTER on [~p]", [node()]),
+    case mnesia:create_schema([node()]) of
+        ok ->
+            ok;
+        {error, {_, {already_exists, _}}} ->
+            ok;
+        {error, E} ->
+            ?ERR("failed to create Mnesia schema: ~p", [E])
+    end,
+    ok = mnesia:start(),
+
+    [create_table(T,A) || {T,A} <- ?MXTABLES],
+    mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
+    clear_all_tables().
+
+run_as_slave(Master) when is_list(Master) ->
+    run_as_slave(list_to_atom(Master));
+
+run_as_slave(Master) when is_atom(Master) ->
+    ?DBG("Run mnesia as SLAVE on [~p] and link to the master [~p]", [node(), Master]),
+    ok = stop(),
+    ok = mnesia:delete_schema([node()]),
+    ok = mnesia:start(),
+
+    case mnesia:change_config(extra_db_nodes, [Master]) of
+        [] ->
+            throw({error, "failed to start Mnesia in slave mode"});
+        {ok, Cluster} ->
+            % FIXME.
+            ?DBG("Mnesia cluster: ~p", [Cluster]),
+            ok
+    end,
+
+    %% there is no clear_all_tables() call, because in that case slave
+    %% can clear all masters tables
+    [copy_table(Table) || {Table, _Attrs} <- ?MXTABLES],
+    mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity).
+
 
 stop() ->
     mnesia:stop(),
