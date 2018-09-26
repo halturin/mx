@@ -45,5 +45,6 @@ demo_run:
 		_build/default/lib/gproc/ebin \
 		_build/default/lib/lager/ebin \
 		_build/default/lib/goldrush/ebin \
+	-config "conf/sys.config" \
 	-eval "lists:map(fun(App) -> application:start(App) end, [gproc, syntax_tools, compiler, goldrush, lager])"
 
