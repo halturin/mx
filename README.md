@@ -42,7 +42,7 @@ You can specifying a **queue limits** in sys.config:
 ]
 ```
 
-And create dir **/usr/local/var/lib/mx/mnesia/** with right permissions. So, mnesia data will bi in:
+And create dir **/usr/local/var/lib/mx/mnesia/** with right permissions. So, mnesia data will be located:
 ```
 /usr/local/var/lib/mx/mnesia/mxnode01@127.0.0.1  %% node name
 ```
@@ -54,14 +54,14 @@ make run
 
 ## Distributed mode
 
-In first terminal window run:
+Run the first node:
 ```erlang
 make demo_run node_name='mxnode01@127.0.0.1'
 
 (mxnode01@127.0.0.1)1> application:start(mx).
 ```
 
-In second terminal window:
+and the second one:
 
 ```erlang
 make demo_run node_name='mxnode02@127.0.0.1'
@@ -118,7 +118,7 @@ mx:join(Client3Key, Pool1Key),
 {poolkey, HP_Hash_Pl}    = mx:register(pool, "HP Pool (hash)", Client2Key, [{priority, 1}, {balance, hash}]),
 
 % pool with random balance
-{poolkey, Rand_Pl}    = mx:register(pool, "Pool (random) ", Client2Key, [balance, hash}]),
+{poolkey, Rand_Pl}    = mx:register(pool, "Pool (random)", Client2Key, [{balance, random}]),
 
 ```
 

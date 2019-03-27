@@ -34,10 +34,13 @@ rel: compile
 	$(REBAR) release
 
 release: compile
-	$(REBAR) as prod release
+	$(REBAR) as prod release -n mx
 
-run: rel
+run: release
 	$(REBAR) run
+
+tar:
+	$(REBAR) as prod tar release -n mx
 
 demo_run:
 	# only for demonstration purposes
