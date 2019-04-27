@@ -42,12 +42,8 @@ You can specifying a **queue limits** in sys.config:
 ]
 ```
 
-And create dir **/usr/local/var/lib/mx/mnesia/** with right permissions. So, mnesia data will be located:
-```
-/usr/local/var/lib/mx/mnesia/mxnode01@127.0.0.1  %% node name
-```
-
 ## Run
+
 ```
 make run
 ```
@@ -77,6 +73,33 @@ Call **mx:nodes()** to get the list of mx cluster nodes.
 ```erlang
 (mxnode01@127.0.0.1)2> mx:nodes().
 ['mxnode01@127.0.0.1','mxnode02@127.0.0.1']
+```
+
+## Mnesia custom directory (optional)
+
+Create dir, for example, **/usr/local/var/lib/mx/mnesia/** with correct (Read/Write) permissions.
+
+Set option `mnesia_base_dir` with this **directory** in `sys.config`:
+
+```
+    {mx, [
+       {mnesia_base_dir,      "/usr/local/var/lib/mx/mnesia/"}
+    ]},
+```
+
+Or set the value of configuration parameter `mnesia_base_dir` for **mx**:
+
+```erlang
+make demo_run node_name='mxnode01@127.0.0.1'
+
+(mxnode01@127.0.0.1)1> application:load(mx).
+(mxnode01@127.0.0.1)1> application:set_env(mx, mnesia_base_dir, "/usr/local/var/lib/mx/mnesia/").
+(mxnode01@127.0.0.1)1> application:start(mx).
+```
+
+So, mnesia data will be located:
+```
+/usr/local/var/lib/mx/mnesia/mxnode01@127.0.0.1  %% node name
 ```
 
 ## Examples
