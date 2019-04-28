@@ -80,13 +80,17 @@ start_link() ->
 init([]) ->
     process_flag(trap_exit, true),
 
-    {ok, MnesiaBaseDir} = application:get_env(mx, mnesia_base_dir),
-    NodeDir = MnesiaBaseDir ++ node(),
-    ok = filelib:ensure_dir(NodeDir),
-    application:set_env(mnesia, dir, NodeDir),
+    case application:get_env(mx, mnesia_base_dir, undefined) of
+        Dir when Dir == ""; Dir == undefined ->
+            pass;
+        MnesiaBaseDir when is_list(MnesiaBaseDir) ->
+            NodeDir = MnesiaBaseDir ++ node(),
+            ok = filelib:ensure_dir(NodeDir),
+            application:set_env(mnesia, dir, NodeDir)
+    end,
 
-    case application:get_env(mx, master, none) of
-        X when X == ""; X == none ->
+    case application:get_env(mx, master, undefined) of
+        X when X == ""; X == undefined ->
             run_as_master();
         Master when is_atom(Master); is_list(Master) ->
             run_as_slave(Master)

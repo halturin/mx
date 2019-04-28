@@ -42,7 +42,7 @@ run: release
 tar:
 	$(REBAR) as prod tar release -n mx
 
-demo_run:
+demo_run: compile
 	# only for demonstration purposes
 	erl -name $(node_name) -pa _build/default/lib/mx/ebin \
 		_build/default/lib/gproc/ebin \
